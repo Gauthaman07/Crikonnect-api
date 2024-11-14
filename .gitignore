@@ -19,10 +19,10 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Build files
+
 dist/
 build/
 
-# Optional: Temporary files
+
 tmp/
 temp/
