@@ -1,7 +1,7 @@
 # Node modules folder
 node_modules/
 
-# Environment variables
+
 .env
 
 # Logs
