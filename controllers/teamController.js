@@ -16,11 +16,17 @@ exports.createTeam = async (req, res) => {
             return res.status(400).json({ error: 'Team logo is required.' });
         }
 
+        // Check if team has ground and validate accordingly
         let ground = null;
         if (hasGround === 'yes') {
             // Validate ground-specific fields if the team has its own ground
             if (!groundDescription || !facilities || !groundFee || !groundImage) {
                 return res.status(400).json({ error: 'Ground details (description, facilities, fee, image) are required.' });
+            }
+
+            // Ensure groundFee is a valid number
+            if (isNaN(groundFee)) {
+                return res.status(400).json({ error: 'Ground Fee must be a valid number.' });
             }
 
             // Ensure facilities is an array
@@ -32,8 +38,8 @@ exports.createTeam = async (req, res) => {
             ground = new Ground({
                 description: groundDescription,
                 image: groundImage.path,  // Save the file path for the ground image
-                facilities: facilities, // Directly use the facilities array
-                groundFee: groundFee,
+                facilities: facilities,   // Already an array from frontend
+                groundFee: parseFloat(groundFee),  // Convert groundFee to a number
             });
             await ground.save();
             console.log('Ground saved:', ground);
@@ -43,7 +49,7 @@ exports.createTeam = async (req, res) => {
         const team = new Team({
             name,
             logo: logo.path,  // Save the logo file path in the database
-            hasGround,
+            hasGround: hasGround === 'yes',  // Store as boolean
             ground: ground ? ground._id : null,  // If the team has a ground, save the reference
         });
 
