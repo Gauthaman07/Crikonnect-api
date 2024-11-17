@@ -6,13 +6,12 @@ const router = express.Router();
 // Route to create a new team with file upload
 router.post(
     "/create",
-    upload.fields([
+    upload.fields([  // Ensure `fields` is being called on the correct `upload` object
         { name: "teamLogo", maxCount: 1 }, // Field name should match the frontend input field
         { name: "groundImage", maxCount: 1 }, // Same as above
     ]),
     createTeam
 );
-
 
 module.exports = router;
 

@@ -21,13 +21,8 @@ const fileFilter = (req, file, cb) => {
     }
 };
 
-// Multer instance for handling multiple files
-const upload = multer({
-    storage,
-    fileFilter,
-}).fields([ // Define the expected fields here
-    { name: "teamLogo", maxCount: 1 },
-    { name: "groundImage", maxCount: 1 }, // If ground image exists
-]);
+const upload = multer({ storage, fileFilter });
 
+// Ensure upload is exported correctly
 module.exports = upload;
+
