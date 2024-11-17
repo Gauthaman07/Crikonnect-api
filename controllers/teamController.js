@@ -1,56 +1,47 @@
-const Team = require("../models/team");
-const Ground = require("../models/ground");
+const Team = require('../models/team');
+const Ground = require('../models/ground');
 
+// Create a team
 const createTeam = async (req, res) => {
     try {
         const { name, hasGround, groundDescription, facilities, groundFee } = req.body;
+        const logo = req.file;  // Get the uploaded file from the request
 
-        // Handle uploaded files
-        const teamLogo = req.files?.teamLogo?.[0]?.path; // File path for team logo
-        let groundImage = null;
-
-        // Validate required fields
-        if (!name || !teamLogo || !hasGround) {
-            return res.status(400).json({ error: "Required fields are missing" });
+        // Check if logo is uploaded
+        if (!logo) {
+            return res.status(400).json({ error: 'Team logo is required.' });
         }
 
-        // Create ground if the team has its own ground
+        // Create a ground if the team has its own ground
         let ground = null;
-        if (hasGround === "yes") {
-            groundImage = req.files?.groundImage?.[0]?.path; // File path for ground image
-            if (!groundDescription || !groundImage || !facilities || !groundFee) {
-                return res.status(400).json({ error: "Ground details are incomplete" });
-            }
-
+        if (hasGround === 'yes') {
+            const { groundImage, groundDescription, facilities, groundFee } = req.body;
             ground = new Ground({
                 description: groundDescription,
                 image: groundImage,
-                facilities,
-                groundFee: parseFloat(groundFee),
+                facilities: facilities,
+                groundFee: groundFee,
             });
-
-            // Save ground to the database
             await ground.save();
         }
 
         // Create the team
         const team = new Team({
             name,
-            logo: teamLogo,
-            hasGround: hasGround === "yes",
+            logo: logo.path, // Save the file path in the database
+            hasGround,
             ground: ground ? ground._id : null,
         });
 
-        // Save team to the database
         await team.save();
 
         return res.status(201).json({
-            message: "Team created successfully!",
+            message: 'Team created successfully!',
             team,
         });
     } catch (error) {
-        console.error("Error in createTeam:", error);
-        return res.status(500).json({ error: "Error creating team" });
+        console.error(error);
+        return res.status(500).json({ error: 'Error creating team' });
     }
 };
 
