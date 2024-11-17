@@ -1,36 +1,40 @@
 const Team = require('../models/team');
 const Ground = require('../models/ground');
 
-// Create a team
-const createTeam = async (req, res) => {
+exports.createTeam = async (req, res) => {
     try {
         const { name, hasGround, groundDescription, facilities, groundFee } = req.body;
-        const logo = req.file;  // Get the uploaded file from the request
+        const logo = req.files.teamLogo ? req.files.teamLogo[0] : null; // Get the team logo from the request
+        const groundImage = req.files.groundImage ? req.files.groundImage[0] : null; // Get the ground image if available
 
         // Check if logo is uploaded
         if (!logo) {
             return res.status(400).json({ error: 'Team logo is required.' });
         }
 
-        // Create a ground if the team has its own ground
+        // If the team has its own ground, validate additional fields
         let ground = null;
         if (hasGround === 'yes') {
-            const { groundImage, groundDescription, facilities, groundFee } = req.body;
+            // Only if hasGround is 'yes', validate ground-specific fields
+            if (!groundDescription || !facilities || !groundFee || !groundImage) {
+                return res.status(400).json({ error: 'Ground details (description, facilities, fee, image) are required.' });
+            }
+
             ground = new Ground({
                 description: groundDescription,
-                image: groundImage,
+                image: groundImage.path, // Save the file path if groundImage is provided
                 facilities: facilities,
                 groundFee: groundFee,
             });
             await ground.save();
         }
 
-        // Create the team
+        // Create the team with the necessary fields
         const team = new Team({
             name,
             logo: logo.path, // Save the file path in the database
-            hasGround,
-            ground: ground ? ground._id : null,
+            hasGround,       // Save if the team has a ground
+            ground: ground ? ground._id : null,  // Save ground reference if applicable
         });
 
         await team.save();
@@ -45,4 +49,3 @@ const createTeam = async (req, res) => {
     }
 };
 
-module.exports = { createTeam };
