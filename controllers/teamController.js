@@ -23,11 +23,16 @@ exports.createTeam = async (req, res) => {
                 return res.status(400).json({ error: 'Ground details (description, facilities, fee, image) are required.' });
             }
 
+            // Ensure facilities is an array
+            if (!Array.isArray(facilities)) {
+                return res.status(400).json({ error: 'Facilities must be an array.' });
+            }
+
             // If all required fields are provided, create the ground
             ground = new Ground({
                 description: groundDescription,
                 image: groundImage.path,  // Save the file path for the ground image
-                facilities: facilities.split(','), // Split facilities if it's a comma-separated string
+                facilities: facilities, // Directly use the facilities array
                 groundFee: groundFee,
             });
             await ground.save();
@@ -54,6 +59,5 @@ exports.createTeam = async (req, res) => {
         return res.status(500).json({ error: 'Error creating team' });
     }
 };
-
 
 
