@@ -7,11 +7,12 @@ const router = express.Router();
 router.post(
     "/create",
     upload.fields([
-        { name: "teamLogo", maxCount: 1 },      // Handle team logo upload
-        { name: "groundImage", maxCount: 1 },  // Handle ground image upload (if provided)
+        { name: "teamLogo", maxCount: 1 }, // Field name should match the frontend input field
+        { name: "groundImage", maxCount: 1 }, // Same as above
     ]),
     createTeam
 );
+
 
 module.exports = router;
 
