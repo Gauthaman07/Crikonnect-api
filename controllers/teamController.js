@@ -3,10 +3,13 @@ const Ground = require('../models/ground');
 
 exports.createTeam = async (req, res) => {
     try {
-        // Access the files uploaded by multer
         const { name, hasGround, groundDescription, facilities, groundFee } = req.body;
-        const logo = req.files.teamLogo ? req.files.teamLogo[0] : null;   // Access team logo
-        const groundImage = req.files.groundImage ? req.files.groundImage[0] : null;   // Access ground image
+        const logo = req.files.teamLogo ? req.files.teamLogo[0] : null; // Get the team logo
+        const groundImage = req.files.groundImage ? req.files.groundImage[0] : null; // Get the ground image if available
+
+        console.log('Received logo:', logo);
+        console.log('Received groundImage:', groundImage);
+        console.log('Team details:', { name, hasGround, groundDescription, facilities, groundFee });
 
         // Check if logo is uploaded
         if (!logo) {
@@ -20,24 +23,27 @@ exports.createTeam = async (req, res) => {
                 return res.status(400).json({ error: 'Ground details (description, facilities, fee, image) are required.' });
             }
 
+            // If all required fields are provided, create the ground
             ground = new Ground({
                 description: groundDescription,
-                image: groundImage.path,   // Save file path for ground image
-                facilities: facilities,
+                image: groundImage.path,  // Save the file path for the ground image
+                facilities: facilities.split(','), // Split facilities if it's a comma-separated string
                 groundFee: groundFee,
             });
             await ground.save();
+            console.log('Ground saved:', ground);
         }
 
-        // Create the team object with logo file path
+        // Create the team object
         const team = new Team({
             name,
             logo: logo.path,  // Save the logo file path in the database
             hasGround,
-            ground: ground ? ground._id : null,  // Reference to ground if available
+            ground: ground ? ground._id : null,  // If the team has a ground, save the reference
         });
 
         await team.save();
+        console.log('Team saved:', team);
 
         return res.status(201).json({
             message: 'Team created successfully!',
@@ -48,5 +54,6 @@ exports.createTeam = async (req, res) => {
         return res.status(500).json({ error: 'Error creating team' });
     }
 };
+
 
 
