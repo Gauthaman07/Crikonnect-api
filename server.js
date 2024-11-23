@@ -56,12 +56,13 @@ app.get('/', (req, res) => {
 
 // MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/sportsBooking';
-mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(MONGO_URI)
     .then(() => console.log('Connected to MongoDB'))
     .catch(err => {
         console.error('Failed to connect to MongoDB:', err.message);
         process.exit(1); // Exit process if DB connection fails
     });
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {
