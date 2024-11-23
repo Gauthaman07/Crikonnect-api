@@ -47,14 +47,16 @@ const createTeam = async (req, res) => {
 
 const getTeamByUser = async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = req.user.id; // Extract user ID from the token's payload
+
+        // Find the team associated with the user
         const team = await Team.findOne({ createdBy: userId });
 
         if (!team) {
             return res.status(404).json({ message: "No team found for this user." });
         }
 
-        res.status(200).json(team);
+        res.status(200).json({ message: "Team fetched successfully", team });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Internal server error", error: error.message });

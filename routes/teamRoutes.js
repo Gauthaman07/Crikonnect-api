@@ -14,7 +14,7 @@ router.post(
     createTeam
 );
 
-router.get('/user', authenticateUser, getTeamByUser);
+router.get('/myteam', authenticateUser, getTeamByUser);
 
 module.exports = router;
 
