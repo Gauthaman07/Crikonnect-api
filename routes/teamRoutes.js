@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { createTeam } = require('../controllers/teamController');
+const { createTeam, getTeamByUser } = require('../controllers/teamController');
 const upload = require('../middleware/upload');
+const authenticateUser = require('../middleware/authenticateUser');
 
-// POST route to create a team
 router.post(
     '/create',
+    authenticateUser,
     upload.fields([
         { name: 'teamLogo', maxCount: 1 },
         { name: 'groundImage', maxCount: 1 },
@@ -13,4 +14,11 @@ router.post(
     createTeam
 );
 
+router.get('/user', authenticateUser, getTeamByUser);
+
 module.exports = router;
+
+
+
+
+
