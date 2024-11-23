@@ -80,12 +80,15 @@ app.listen(PORT, () => {
 
 
 process.on('SIGTERM', () => {
-    console.log('SIGTERM received, closing server...');
-    app.close(() => {
-        console.log('Server closed');
-        mongoose.connection.close(() => {
-            console.log('MongoDB connection closed');
-            process.exit(0);
-        });
+    console.log('SIGTERM received: Closing server gracefully...');
+    // Add any cleanup logic here (e.g., close DB connections)
+    server.close(() => {
+        console.log('Server closed.');
+        process.exit(0);
     });
+});
+
+process.on('SIGINT', () => {
+    console.log('SIGINT received: Shutting down...');
+    process.exit(0);
 });
