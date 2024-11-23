@@ -1,69 +1,39 @@
+
 const Team = require('../models/team');
-const Ground = require('../models/ground');
 
-exports.createTeam = async (req, res) => {
+const createTeam = async (req, res) => {
     try {
-        const { name, hasGround, groundDescription, facilities, groundFee } = req.body;
-        const logo = req.files.teamLogo ? req.files.teamLogo[0] : null; // Get the team logo
-        const groundImage = req.files.groundImage ? req.files.groundImage[0] : null; // Get the ground image if available
+        const {
+            teamName,
+            hasOwnGround,
+            groundDescription,
+            facilities,
+            groundFee,
+        } = req.body;
 
-        console.log('Received logo:', logo);
-        console.log('Received groundImage:', groundImage);
-        console.log('Team details:', { name, hasGround, groundDescription, facilities, groundFee });
+        const teamLogo = req.files?.teamLogo[0]?.path;
+        const groundImage = req.files?.groundImage?.[0]?.path || null;
 
-        // Check if logo is uploaded
-        if (!logo) {
-            return res.status(400).json({ error: 'Team logo is required.' });
+        if (!teamName || !teamLogo || hasOwnGround === undefined) {
+            return res.status(400).json({ message: 'Required fields are missing.' });
         }
 
-        // Check if team has ground and validate accordingly
-        let ground = null;
-        if (hasGround === 'yes') {
-            // Validate ground-specific fields if the team has its own ground
-            if (!groundDescription || !facilities || !groundFee || !groundImage) {
-                return res.status(400).json({ error: 'Ground details (description, facilities, fee, image) are required.' });
-            }
-
-            // Ensure groundFee is a valid number
-            if (isNaN(groundFee)) {
-                return res.status(400).json({ error: 'Ground Fee must be a valid number.' });
-            }
-
-            // Ensure facilities is an array
-            if (!Array.isArray(facilities)) {
-                return res.status(400).json({ error: 'Facilities must be an array.' });
-            }
-
-            // If all required fields are provided, create the ground
-            ground = new Ground({
-                description: groundDescription,
-                image: groundImage.path,  // Save the file path for the ground image
-                facilities: facilities,   // Already an array from frontend
-                groundFee: parseFloat(groundFee),  // Convert groundFee to a number
-            });
-            await ground.save();
-            console.log('Ground saved:', ground);
-        }
-
-        // Create the team object
-        const team = new Team({
-            name,
-            logo: logo.path,  // Save the logo file path in the database
-            hasGround: hasGround === 'yes',  // Store as boolean
-            ground: ground ? ground._id : null,  // If the team has a ground, save the reference
+        const newTeam = new Team({
+            teamName,
+            teamLogo,
+            hasOwnGround,
+            groundDescription: hasOwnGround === 'true' ? groundDescription : null,
+            groundImage: hasOwnGround === 'true' ? groundImage : null,
+            facilities: hasOwnGround === 'true' ? facilities : [],
+            groundFee: hasOwnGround === 'true' ? groundFee : null,
         });
 
-        await team.save();
-        console.log('Team saved:', team);
-
-        return res.status(201).json({
-            message: 'Team created successfully!',
-            team,
-        });
+        await newTeam.save();
+        res.status(201).json({ message: 'Team created successfully!', team: newTeam });
     } catch (error) {
-        console.error('Error during team creation:', error);
-        return res.status(500).json({ error: 'Error creating team' });
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error', error: error.message });
     }
 };
 
-
+module.exports = { createTeam };

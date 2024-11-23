@@ -3,6 +3,8 @@ const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const multer = require('multer');
+const fs = require('fs');
+const helmet = require('helmet');
 const authRoutes = require('./routes/auth');
 const teamRoutes = require('./routes/teamRoutes');
 
@@ -10,29 +12,35 @@ dotenv.config();
 
 const app = express();
 
+// Ensure the 'uploads' folder exists
+if (!fs.existsSync('./uploads')) {
+    fs.mkdirSync('./uploads');
+}
+
 // CORS Configuration
 const corsOptions = {
-    origin: '*',  // Or specify your frontend URL
+    origin: '*', // Or specify your frontend URL
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-app.use(cors(corsOptions));  // Apply CORS configuration
+app.use(cors(corsOptions)); // Apply CORS configuration
 
 // Set up multer for file upload
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, './uploads');  // Destination folder for uploaded files
+        cb(null, './uploads'); // Destination folder for uploaded files
     },
     filename: function (req, file, cb) {
-        cb(null, Date.now() + '-' + file.originalname);  // File name will be the timestamp + original name
-    }
+        cb(null, Date.now() + '-' + file.originalname); // File name will be the timestamp + original name
+    },
 });
 const upload = multer({ storage: storage });
 
-// Parse incoming JSON and URL-encoded data
+// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(helmet()); // Add security headers
 
 // Serve uploaded files from the 'uploads' folder
 app.use('/uploads', express.static('uploads'));
@@ -47,12 +55,22 @@ app.get('/', (req, res) => {
 });
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI)
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/sportsBooking';
+mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => console.log('Connected to MongoDB'))
-    .catch(err => console.error('MongoDB connection error:', err));
+    .catch(err => {
+        console.error('Failed to connect to MongoDB:', err.message);
+        process.exit(1); // Exit process if DB connection fails
+    });
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
+});
+
+// Start the server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
-

@@ -1,17 +1,16 @@
-const express = require("express");
-const { createTeam } = require("../controllers/teamController");
-const upload = require("../middleware/upload"); // Import the multer configuration
+const express = require('express');
 const router = express.Router();
+const { createTeam } = require('../controllers/teamController');
+const upload = require('../middleware/upload');
 
-// Route to create a new team with file upload
+// POST route to create a team
 router.post(
-    "/create",
-    upload.fields([  // Ensure `fields` is being called on the correct `upload` object
-        { name: "teamLogo", maxCount: 1 }, // Field name should match the frontend input field
-        { name: "groundImage", maxCount: 1 }, // Same as above
+    '/create',
+    upload.fields([
+        { name: 'teamLogo', maxCount: 1 },
+        { name: 'groundImage', maxCount: 1 },
     ]),
     createTeam
 );
 
 module.exports = router;
-
