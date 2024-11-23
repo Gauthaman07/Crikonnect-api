@@ -8,6 +8,8 @@ const teamSchema = new mongoose.Schema({
     groundImage: { type: String },
     facilities: [{ type: String }],
     groundFee: { type: Number },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Link to User
 });
 
 module.exports = mongoose.model('Team', teamSchema);
+
