@@ -7,6 +7,8 @@ const fs = require('fs');
 const helmet = require('helmet');
 const authRoutes = require('./routes/auth');
 const teamRoutes = require('./routes/teamRoutes');
+const cloudinary = require('cloudinary').v2;
+
 
 dotenv.config();
 
