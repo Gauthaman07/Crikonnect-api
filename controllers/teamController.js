@@ -5,6 +5,7 @@ const createTeam = async (req, res) => {
         const userId = req.user.id; // Assuming user info is in `req.user`
         const {
             teamName,
+            location,
             hasOwnGround,
             groundDescription,
             facilities,
@@ -14,7 +15,7 @@ const createTeam = async (req, res) => {
         const teamLogo = req.files?.teamLogo[0]?.path;
         const groundImage = req.files?.groundImage?.[0]?.path || null;
 
-        if (!teamName || !teamLogo || hasOwnGround === undefined) {
+        if (!teamName || !teamLogo || !location || hasOwnGround === undefined) {
             return res.status(400).json({ message: 'Required fields are missing.' });
         }
 
@@ -27,6 +28,7 @@ const createTeam = async (req, res) => {
         const newTeam = new Team({
             teamName,
             teamLogo,
+            location,
             hasOwnGround: hasOwnGround === 'true',
             groundDescription: hasOwnGround === 'true' ? groundDescription : null,
             groundImage: hasOwnGround === 'true' ? groundImage : null,

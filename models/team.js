@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const teamSchema = new mongoose.Schema({
     teamName: { type: String, required: true },
     teamLogo: { type: String, required: true },
+    location: { type: String, required: true },
     hasOwnGround: { type: Boolean, required: true },
     groundDescription: { type: String },
     groundImage: { type: String },
