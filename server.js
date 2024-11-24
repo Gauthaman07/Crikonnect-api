@@ -8,7 +8,7 @@ const helmet = require('helmet');
 const authRoutes = require('./routes/auth');
 const teamRoutes = require('./routes/teamRoutes');
 const cloudinary = require('cloudinary').v2;
-
+const groundRoutes = require('./routes/groundRoutes');
 
 dotenv.config();
 
@@ -50,6 +50,7 @@ app.use('/uploads', express.static('uploads'));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/team', teamRoutes);
+app.use('/api/grounds', groundRoutes);
 
 // Test route
 app.get('/', (req, res) => {
