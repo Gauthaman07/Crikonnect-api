@@ -1,31 +1,37 @@
 const Team = require('../models/team');
-const Ground = require('../models/ground');
 
 const getAvailableGrounds = async (req, res) => {
     try {
         const userId = req.user.id;
 
-        // Fetch the team associated with the user
+        // Fetch the user's team
         const userTeam = await Team.findOne({ createdBy: userId });
 
         if (!userTeam) {
             return res.status(404).json({ message: 'User has not created a team yet.' });
         }
 
-        // Check if the user has their own ground
         if (userTeam.hasOwnGround) {
-            // Fetch user's ground bookings and all other available grounds
-            const userBookings = await Ground.find({ owner: userId });
-            const otherAvailableGrounds = await Ground.find({ owner: { $ne: userId } });
+            // User has their own ground, fetch their bookings and other grounds
+            const yourGround = {
+                groundDescription: userTeam.groundDescription,
+                groundImage: userTeam.groundImage,
+                facilities: userTeam.facilities,
+                groundFee: userTeam.groundFee,
+            };
+
+            const otherGrounds = await Team.find({ hasOwnGround: true, createdBy: { $ne: userId } })
+                .select('groundDescription groundImage facilities groundFee teamName location');
 
             return res.status(200).json({
                 message: 'Grounds fetched successfully',
-                yourBookings: userBookings,
-                otherGrounds: otherAvailableGrounds,
+                yourGround,
+                otherGrounds,
             });
         } else {
-            // Fetch all grounds owned by other users
-            const availableGrounds = await Ground.find({ owner: { $ne: userId } });
+            // User does not have a ground, fetch all other available grounds
+            const availableGrounds = await Team.find({ hasOwnGround: true })
+                .select('groundDescription groundImage facilities groundFee teamName location');
 
             return res.status(200).json({
                 message: 'Available grounds fetched successfully',
