@@ -7,3 +7,4 @@ const authenticateUser = require('../middleware/authenticateUser');
 router.get('/', authenticateUser, getAvailableGrounds);
 
 module.exports = router;
+
