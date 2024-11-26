@@ -2,40 +2,52 @@ const Team = require('../models/team');
 
 const getAvailableGrounds = async (req, res) => {
     try {
-        const userId = req.user.id; // Assuming user authentication middleware provides `req.user`
+        const userId = req.user.id; // Assuming authentication middleware provides `req.user`
+        const { location } = req.query; // Filter by location if provided
 
-        // Fetch the user's team
-        const userTeam = await Team.findOne({ createdBy: userId });
+        // Fetch the user's team and populate their ground if it exists
+        const userTeam = await Team.findOne({ createdBy: userId }).populate('groundId');
 
         if (!userTeam) {
             return res.status(404).json({ message: 'User has not created a team yet.' });
         }
 
-        // Fetch all grounds except the user's ground (if it exists)
-        const otherGrounds = await Team.find({
-            hasOwnGround: true,
-            createdBy: { $ne: userId },
-        }).select('groundDescription groundImage facilities groundFee teamName location');
+        let yourGround = null;
 
-        if (userTeam.hasOwnGround) {
-            // User has their own ground
-            const yourGround = {
-                groundDescription: userTeam.groundDescription,
-                groundImage: userTeam.groundImage,
-                facilities: userTeam.facilities || [],
-                groundFee: userTeam.groundFee,
+        if (userTeam.hasOwnGround && userTeam.groundId) {
+            // Prepare user's ground details
+            yourGround = {
+                groundName: userTeam.groundId.groundName,
+                description: userTeam.groundId.description,
+                image: userTeam.groundId.image,
+                facilities: userTeam.groundId.facilities,
+                location: userTeam.groundId.location,
+                fee: userTeam.groundId.fee,
             };
+        }
 
-            return res.status(200).json({
-                message: 'Available grounds fetched successfully',
-                grounds: otherGrounds,
+        // Fetch all grounds, filtered by location if provided
+        const groundsQuery = location ? { location } : {};
+        const allGrounds = await Ground.find(groundsQuery).select(
+            'groundName description image facilities location fee createdBy'
+        );
+
+        // Separate the user's own ground from other grounds (for ground-owning teams)
+        const otherGrounds = allGrounds.filter(
+            (ground) => !yourGround || ground._id.toString() !== userTeam.groundId._id.toString()
+        );
+
+        // Response
+        if (yourGround) {
+            res.status(200).json({
+                message: 'Grounds fetched successfully.',
                 yourGround,
+                otherGrounds,
             });
         } else {
-            // User does not have their own ground
-            return res.status(200).json({
-                message: 'Available grounds fetched successfully',
-                grounds: otherGrounds,
+            res.status(200).json({
+                message: 'Grounds fetched successfully.',
+                grounds: allGrounds,
             });
         }
     } catch (error) {
@@ -43,5 +55,6 @@ const getAvailableGrounds = async (req, res) => {
         res.status(500).json({ message: 'Internal server error', error: error.message });
     }
 };
+
 
 module.exports = { getAvailableGrounds };

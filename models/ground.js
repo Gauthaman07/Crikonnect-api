@@ -2,22 +2,13 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const groundSchema = new Schema({
-    description: {
-        type: String,
-        required: true,
-    },
-    image: {
-        type: String,  // URL or file path for the image
-        required: true,
-    },
-    facilities: {
-        type: [String],  // Array of facilities (e.g., Parking, Changing Rooms)
-        required: true,
-    },
-    groundFee: {
-        type: Number,
-        required: true,
-    },
+    groundName: { type: String, required: true },
+    description: { type: String, required: true },
+    image: { type: String, required: true },
+    facilities: { type: [String], required: true },
+    location: { type: String, required: true },
+    fee: { type: Number, required: true },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 });
 
 const Ground = mongoose.model('Ground', groundSchema);
