@@ -1,8 +1,9 @@
-const Team = require('../models/team');
+const Team = require('../models/team'); // Ensure Team model is imported
+const Ground = require('../models/ground'); // Import the Ground model
 
 const getAvailableGrounds = async (req, res) => {
     try {
-        const userId = req.user.id; // Assuming authentication middleware provides `req.user`
+        const userId = req.user.id; // Assuming user authentication middleware provides `req.user`
         const { location } = req.query; // Filter by location if provided
 
         // Fetch the user's team and populate their ground if it exists
@@ -55,6 +56,5 @@ const getAvailableGrounds = async (req, res) => {
         res.status(500).json({ message: 'Internal server error', error: error.message });
     }
 };
-
 
 module.exports = { getAvailableGrounds };
