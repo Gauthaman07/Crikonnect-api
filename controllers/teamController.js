@@ -31,9 +31,9 @@ const createTeam = async (req, res) => {
 
         if (hasOwnGround === 'true' || hasOwnGround === true) {
             // Validate ground fields
-            // if (!groundName || !description || !facilities || !fee || !groundImage) {
-            //     return res.status(400).json({ message: 'Ground details are missing or incomplete.' });
-            // }
+            if (!groundName || !description || !facilities || !fee || !groundImage) {
+                return res.status(400).json({ message: 'Ground details are missing or incomplete.' });
+            }
 
             // Create a new ground document
             const newGround = new Ground({
