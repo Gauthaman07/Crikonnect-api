@@ -3,7 +3,6 @@ const Ground = require('../models/ground');
 
 const createTeam = async (req, res) => {
     try {
-        // Log request body and files for debugging
         console.log('Request body:', req.body); 
         console.log('Files:', req.files); 
         console.log('Facilities:', req.body.facilities);
@@ -16,11 +15,11 @@ const createTeam = async (req, res) => {
             groundName,
             description,
             facilities,
-            fee,
+            groundFee,
         } = req.body;
 
         // Parse `hasOwnGround` to boolean if it's a string 'true'/'false'
-        const hasGround = hasOwnGround === 'true' || hasOwnGround === true;
+        const hasGround = (hasOwnGround === 'true') || (hasOwnGround === true);
 
         // Handle file uploads
         const teamLogo = req.files?.teamLogo[0]?.path;
@@ -42,7 +41,7 @@ const createTeam = async (req, res) => {
         // Only create ground if the user has their own ground
         if (hasGround) {
             // Ensure all ground details are present
-            if (!groundName || !description || !facilities || !fee || !groundImage) {
+            if (!groundName || !description || !facilities || !groundFee || !groundImage) {
                 return res.status(400).json({ message: 'Ground details are missing or incomplete.' });
             }
 
@@ -52,8 +51,8 @@ const createTeam = async (req, res) => {
             }
 
             // Parse fee to ensure it's a number
-            const groundFee = parseFloat(fee);
-            if (isNaN(groundFee)) {
+            const parsedFee = parseFloat(groundFee);
+            if (isNaN(parsedFee)) {
                 return res.status(400).json({ message: 'Invalid ground fee value.' });
             }
 
@@ -64,7 +63,7 @@ const createTeam = async (req, res) => {
                 image: groundImage,
                 facilities,
                 location,
-                fee: groundFee,
+                fee: parsedFee,
                 createdBy: userId,
             });
 
@@ -89,6 +88,7 @@ const createTeam = async (req, res) => {
         res.status(500).json({ message: 'Internal server error', error: error.message });
     }
 };
+
 
 const getTeamByUser = async (req, res) => {
     try {
