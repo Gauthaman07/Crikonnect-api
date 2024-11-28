@@ -3,10 +3,9 @@ const Ground = require('../models/ground');
 
 const createTeam = async (req, res) => {
     try {
-
-
-        console.log('Request body:', req.body); // Log the request payload
-        console.log('Files:', req.files); // Log any uploaded files
+        // Log request body and files for debugging
+        console.log('Request body:', req.body); 
+        console.log('Files:', req.files); 
         console.log('Facilities:', req.body.facilities);
 
         const userId = req.user.id; // Assuming authentication middleware provides `req.user`
@@ -20,10 +19,15 @@ const createTeam = async (req, res) => {
             fee,
         } = req.body;
 
+        // Parse `hasOwnGround` to boolean if it's a string 'true'/'false'
+        const hasGround = hasOwnGround === 'true' || hasOwnGround === true;
+
+        // Handle file uploads
         const teamLogo = req.files?.teamLogo[0]?.path;
         const groundImage = req.files?.groundImage?.[0]?.path || null;
 
-        if (!teamName || !teamLogo || !location || hasOwnGround === undefined) {
+        // Check for required fields
+        if (!teamName || !teamLogo || !location || hasGround === undefined) {
             return res.status(400).json({ message: 'Required fields are missing.' });
         }
 
@@ -35,20 +39,32 @@ const createTeam = async (req, res) => {
 
         let groundId = null;
 
-        if (hasOwnGround === 'true' || hasOwnGround === true) {
-            // Validate ground fields
+        // Only create ground if the user has their own ground
+        if (hasGround) {
+            // Ensure all ground details are present
             if (!groundName || !description || !facilities || !fee || !groundImage) {
                 return res.status(400).json({ message: 'Ground details are missing or incomplete.' });
             }
 
-            // Create a new ground document
+            // Validate facilities as an array of strings
+            if (!Array.isArray(facilities)) {
+                return res.status(400).json({ message: 'Facilities must be an array of strings.' });
+            }
+
+            // Parse fee to ensure it's a number
+            const groundFee = parseFloat(fee);
+            if (isNaN(groundFee)) {
+                return res.status(400).json({ message: 'Invalid ground fee value.' });
+            }
+
+            // Create the ground document
             const newGround = new Ground({
                 groundName,
                 description,
                 image: groundImage,
                 facilities,
                 location,
-                fee,
+                fee: groundFee,
                 createdBy: userId,
             });
 
@@ -61,7 +77,7 @@ const createTeam = async (req, res) => {
             teamName,
             teamLogo,
             location,
-            hasOwnGround: hasOwnGround === 'true',
+            hasOwnGround: hasGround,
             groundId,
             createdBy: userId,
         });
@@ -73,7 +89,6 @@ const createTeam = async (req, res) => {
         res.status(500).json({ message: 'Internal server error', error: error.message });
     }
 };
-
 
 const getTeamByUser = async (req, res) => {
     try {
@@ -108,13 +123,9 @@ const getTeamByUser = async (req, res) => {
 
         res.status(200).json({ message: "Team fetched successfully", team: response });
     } catch (error) {
-        console.error(error);
+        console.error('Error fetching team:', error);
         res.status(500).json({ message: "Internal server error", error: error.message });
     }
 };
 
-
 module.exports = { createTeam, getTeamByUser };
-
-
-
