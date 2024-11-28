@@ -3,6 +3,12 @@ const Ground = require('../models/ground');
 
 const createTeam = async (req, res) => {
     try {
+
+
+        console.log('Request body:', req.body); // Log the request payload
+        console.log('Files:', req.files); // Log any uploaded files
+        console.log('Facilities:', req.body.facilities);
+
         const userId = req.user.id; // Assuming authentication middleware provides `req.user`
         const {
             teamName,
