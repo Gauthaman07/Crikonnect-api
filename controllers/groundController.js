@@ -31,7 +31,7 @@ const getAvailableGrounds = async (req, res) => {
         // Fetch all grounds, filtered by location if provided
         const groundsQuery = location ? { location } : {};
         const allGrounds = await Ground.find(groundsQuery).select(
-            'groundName description image facilities location fee createdBy'
+            'groundName description groundMaplink image facilities location fee createdBy'
         );
 
         // Separate the user's own ground from other grounds (for ground-owning teams)
