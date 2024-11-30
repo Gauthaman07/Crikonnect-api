@@ -4,6 +4,7 @@ const Schema = mongoose.Schema;
 const groundSchema = new Schema({
     groundName: { type: String, required: true },
     description: { type: String, required: true },
+    groundMaplink: { type: String, required: true },
     image: { type: String, required: true },
     facilities: { type: [String], required: true },
     location: { type: String, required: true },

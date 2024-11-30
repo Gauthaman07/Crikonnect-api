@@ -20,6 +20,7 @@ const getAvailableGrounds = async (req, res) => {
             yourGround = {
                 groundName: userTeam.groundId.groundName,
                 description: userTeam.groundId.description,
+                groundMaplink: userTeam.groundId.groundMaplink,
                 image: userTeam.groundId.image,
                 facilities: userTeam.groundId.facilities,
                 location: userTeam.groundId.location,

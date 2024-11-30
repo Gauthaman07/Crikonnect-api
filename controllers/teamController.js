@@ -3,8 +3,8 @@ const Ground = require('../models/ground');
 
 const createTeam = async (req, res) => {
     try {
-        console.log('Request body:', req.body); 
-        console.log('Files:', req.files); 
+        console.log('Request body:', req.body);
+        console.log('Files:', req.files);
         console.log('Facilities:', req.body.facilities);
 
         const userId = req.user.id; // Assuming authentication middleware provides `req.user`
@@ -14,6 +14,7 @@ const createTeam = async (req, res) => {
             hasOwnGround,
             groundName,
             description,
+            groundMaplink,
             facilities,
             groundFee,
         } = req.body;
@@ -41,7 +42,7 @@ const createTeam = async (req, res) => {
         // Only create ground if the user has their own ground
         if (hasGround) {
             // Ensure all ground details are present
-            if (!groundName || !description || !facilities || !groundFee || !groundImage) {
+            if (!groundName || !description || !groundMaplink || !facilities || !groundFee || !groundImage) {
                 return res.status(400).json({ message: 'Ground details are missing or incomplete.' });
             }
 
@@ -60,6 +61,7 @@ const createTeam = async (req, res) => {
             const newGround = new Ground({
                 groundName,
                 description,
+                groundMaplink,
                 image: groundImage,
                 facilities,
                 location,
@@ -113,6 +115,7 @@ const getTeamByUser = async (req, res) => {
                 ? {
                     groundName: team.groundId.groundName,
                     description: team.groundId.description,
+                    groundMaplink: team.groundId.groundMaplink,
                     image: team.groundId.image,
                     facilities: team.groundId.facilities,
                     location: team.groundId.location,
