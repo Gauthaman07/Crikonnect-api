@@ -42,9 +42,12 @@ exports.login = async (req, res) => {
 
     try {
         // Find the user by email or mobile number
+        console.log("Input:", emailOrMobile);
         const user = await User.findOne({
             $or: [{ email: emailOrMobile }, { mobile: emailOrMobile }],
         });
+        console.log("User found:", user);
+        
 
         if (!user) {
             return res.status(400).json({ message: "Invalid credentials" });
