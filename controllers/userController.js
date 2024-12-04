@@ -38,10 +38,14 @@ exports.signup = async (req, res) => {
 
 // Login logic
 exports.login = async (req, res) => {
-    const { email, password } = req.body;
+    const { emailOrMobile, password } = req.body;
 
     try {
-        const user = await User.findOne({ email });
+        // Find the user by email or mobile number
+        const user = await User.findOne({
+            $or: [{ email: emailOrMobile }, { mobile: emailOrMobile }],
+        });
+
         if (!user) {
             return res.status(400).json({ message: "Invalid credentials" });
         }
@@ -55,8 +59,12 @@ exports.login = async (req, res) => {
         // Generate a JWT token
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
-        res.status(200).json({ token, user: { email: user.email } });
+        res.status(200).json({ 
+            token, 
+            user: { email: user.email, mobile: user.mobile } 
+        });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ message: "Server error" });
     }
 };
