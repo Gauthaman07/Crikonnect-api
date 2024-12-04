@@ -4,13 +4,18 @@ const User = require('../models/User');
 
 // Signup logic (already implemented)
 exports.signup = async (req, res) => {
-    const { email, password, confirmPassword } = req.body;
+    const {mobile, email, password, confirmPassword } = req.body;
 
     if (password !== confirmPassword) {
         return res.status(400).json({ message: "Passwords don't match" });
     }
 
     try {
+        const mobileExists = await User.findOne({ mobile });
+        if (mobileExists) {
+            return res.status(400).json({ message: "Mobile number already registered" });
+        }        
+
         const userExists = await User.findOne({ email });
         if (userExists) {
             return res.status(400).json({ message: "Email already registered" });
@@ -18,6 +23,7 @@ exports.signup = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = new User({
+            mobile,
             email,
             password: hashedPassword
         });
