@@ -9,6 +9,9 @@ const authRoutes = require('./routes/auth');
 const teamRoutes = require('./routes/teamRoutes');
 const cloudinary = require('cloudinary').v2;
 const groundRoutes = require('./routes/groundRoutes');
+const groundBookingRoutes = require('./routes/groundBookingRoutes');
+
+
 
 dotenv.config();
 
@@ -51,7 +54,7 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api/auth', authRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/grounds', groundRoutes);
-
+app.use('/api', groundBookingRoutes);
 // Test route
 app.get('/', (req, res) => {
     res.send('Welcome to the Sports Booking API!');
