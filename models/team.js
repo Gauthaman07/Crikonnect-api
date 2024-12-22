@@ -6,6 +6,7 @@ const teamSchema = new Schema({
     teamLogo: { type: String, required: true },
     location: { type: String, required: true },
     hasOwnGround: { type: Boolean, required: true },
+    members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     groundId: { type: mongoose.Schema.Types.ObjectId, ref: 'Ground', default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 });

@@ -6,6 +6,7 @@ const multer = require('multer');
 const fs = require('fs');
 const helmet = require('helmet');
 const authRoutes = require('./routes/auth');
+const userProfileRoutes = require('./routes/userprofile');
 const teamRoutes = require('./routes/teamRoutes');
 const cloudinary = require('cloudinary').v2;
 const groundRoutes = require('./routes/groundRoutes');
@@ -52,6 +53,7 @@ app.use('/uploads', express.static('uploads'));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/user', userProfileRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/grounds', groundRoutes);
 app.use('/api', groundBookingRoutes);

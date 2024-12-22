@@ -71,3 +71,62 @@ exports.login = async (req, res) => {
         res.status(500).json({ message: "Server error" });
     }
 };
+
+// ... your existing signup and login code ...
+
+// Add this new profile endpoint
+exports.getProfile = async (req, res) => {
+    try {
+        // Get user details (excluding password)
+        const user = await User.findById(req.user.id)
+            .select('-password');
+        
+        // Find team where user is either creator or member
+        const team = await Team.findOne({
+            $or: [
+                { createdBy: req.user.id },
+                { members: req.user.id }
+            ]
+        }).populate('groundId');
+
+        // Structure the response
+        const profileData = {
+            user: {
+                id: user._id,
+                email: user.email,
+                mobile: user.mobile,
+                createdAt: user.createdAt
+            },
+            team: team ? {
+                id: team._id,
+                teamName: team.teamName,
+                teamLogo: team.teamLogo,
+                location: team.location,
+                hasOwnGround: team.hasOwnGround,
+                ground: team.groundId ? {
+                    id: team.groundId._id,
+                    groundName: team.groundId.groundName,
+                    description: team.groundId.description,
+                    groundMaplink: team.groundId.groundMaplink,
+                    image: team.groundId.image,
+                    facilities: team.groundId.facilities,
+                    location: team.groundId.location,
+                    fee: team.groundId.fee
+                } : null
+            } : null
+        };
+
+        res.status(200).json({
+            success: true,
+            data: profileData
+        });
+
+    } catch (error) {
+        console.error('Error fetching user profile:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error fetching user profile',
+            error: error.message 
+        });
+    }
+};
