@@ -56,7 +56,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userProfileRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/grounds', groundRoutes);
-app.use('/api', groundBookingRoutes);
+app.use('/api/ground-booking', groundBookingRoutes);
 // Test route
 app.get('/', (req, res) => {
     res.send('Welcome to the Sports Booking API!');
