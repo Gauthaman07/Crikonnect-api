@@ -18,7 +18,7 @@ exports.bookGround = async (req, res) => {
         }
 
         // Validate time slot
-        const validSlots = ['Morning', 'Afternoon'];
+        const validSlots = ['morning', 'afternoon'];
         if (!validSlots.includes(timeSlot)) {
             return res.status(400).json({ 
                 message: 'Invalid time slot. Must be either "Morning" or "Afternoon".' 
