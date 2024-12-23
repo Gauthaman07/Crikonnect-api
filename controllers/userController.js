@@ -77,8 +77,6 @@ exports.login = async (req, res) => {
 // ... your existing signup and login code ...
 
 // Add this new profile endpoint
-// ... your existing imports and other functions ...
-
 exports.getProfile = async (req, res) => {
     try {
         // Get user details (excluding password)
@@ -92,7 +90,8 @@ exports.getProfile = async (req, res) => {
                 { members: req.user.id }
             ]
         }).populate('groundId');
-        
+
+        // Structure the response
         const profileData = {
             user: {
                 id: user._id,
