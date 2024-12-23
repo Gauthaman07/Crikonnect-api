@@ -1,6 +1,9 @@
 const GroundBooking = require('../models/groundBooking');
 const Ground = require('../models/ground');
 const Team = require('../models/team');
+const User = require('../models/User');
+const transporter = require('../config/emailConfig');
+
 
 exports.bookGround = async (req, res) => {
     try {
@@ -70,6 +73,42 @@ exports.bookGround = async (req, res) => {
         });
 
         const savedBooking = await newBooking.save();
+
+        // const ground = await Ground.findById(groundId);
+        const groundOwner = await User.findById(ground.createdBy);
+        
+        // Fetch requesting team's details
+        const requestingTeam = await Team.findById(bookedByTeam);
+
+        // Format date for email
+        const formattedDate = new Date(bookedDate).toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        // Send email to ground owner
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: groundOwner.email,
+            subject: 'New Ground Booking Request',
+            html: `
+                <h2>New Booking Request</h2>
+                <p>You have received a new booking request for your ground.</p>
+                <h3>Booking Details:</h3>
+                <ul>
+                    <li><strong>Team:</strong> ${requestingTeam.teamName}</li>
+                    <li><strong>Date:</strong> ${formattedDate}</li>
+                    <li><strong>Time Slot:</strong> ${timeSlot}</li>
+                    <li><strong>Ground:</strong> ${ground.groundName}</li>
+                </ul>
+                <p>Please log in to your account to approve or reject this request.</p>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+
 
         res.status(201).json({ 
             success: true,
