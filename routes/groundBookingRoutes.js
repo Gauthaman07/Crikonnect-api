@@ -3,6 +3,7 @@ const router = express.Router();
 const { bookGround } = require('../controllers/groundBookingController');
 const authenticateUser = require('../middleware/authenticateUser');
 
-router.post('/ground/book', authenticateUser, bookGround);
+// Changed from /ground/book to just /book since we're already in ground booking routes
+router.post('ground//book', authenticateUser, bookGround);
 
 module.exports = router;

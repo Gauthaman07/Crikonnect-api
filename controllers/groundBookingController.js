@@ -2,7 +2,7 @@ const GroundBooking = require('../models/groundBooking');
 const Ground = require('../models/ground');
 const Team = require('../models/team');
 
-const bookGround = async (req, res) => {
+exports.bookGround = async (req, res) => {
     try {
         // Check if user is authenticated
         if (!req.user || !req.user.id) {
@@ -15,11 +15,6 @@ const bookGround = async (req, res) => {
         // Validation checks for required fields
         if (!groundId || !bookedDate || !timeSlot || !bookedByTeam) {
             return res.status(400).json({ message: 'Required fields are missing.' });
-        }
-
-        // Validate date format
-        if (isNaN(Date.parse(bookedDate))) {
-            return res.status(400).json({ message: 'Invalid date format.' });
         }
 
         // Validate time slot
@@ -91,5 +86,3 @@ const bookGround = async (req, res) => {
         });
     }
 };
-
-module.exports = { bookGround };
