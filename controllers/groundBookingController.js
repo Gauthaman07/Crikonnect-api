@@ -88,36 +88,51 @@ exports.bookGround = async (req, res) => {
             day: 'numeric'
         });
 
-        // Send email to ground owner
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: groundOwner.email,
-            subject: 'New Ground Booking Request',
-            html: `
-                <h2>New Booking Request</h2>
-                <p>You have received a new booking request for your ground.</p>
-                <h3>Booking Details:</h3>
-                <ul>
-                    <li><strong>Team:</strong> ${requestingTeam.teamName}</li>
-                    <li><strong>Date:</strong> ${formattedDate}</li>
-                    <li><strong>Time Slot:</strong> ${timeSlot}</li>
-                    <li><strong>Ground:</strong> ${ground.groundName}</li>
-                </ul>
-                <p>Please log in to your account to approve or reject this request.</p>
-            `
-        };
+        try {
+            console.log('Attempting to send email...');
+            console.log('Ground owner email:', groundOwner.email);
+            
+            const mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: groundOwner.email,
+                subject: 'New Ground Booking Request',
+                html: `
+                    <h2>New Booking Request</h2>
+                    <p>You have received a new booking request for your ground.</p>
+                    <h3>Booking Details:</h3>
+                    <ul>
+                        <li><strong>Team:</strong> ${team.teamName}</li>
+                        <li><strong>Date:</strong> ${formattedDate}</li>
+                        <li><strong>Time Slot:</strong> ${timeSlot}</li>
+                        <li><strong>Ground:</strong> ${ground.groundName}</li>
+                    </ul>
+                    <p>Please log in to your account to approve or reject this request.</p>
+                `
+            };
 
-        await transporter.sendMail(mailOptions);
+            console.log('Mail options:', mailOptions);
 
+            const info = await transporter.sendMail(mailOptions);
+            console.log('Email sent successfully:', info);
 
-        res.status(201).json({ 
-            success: true,
-            message: 'Booking request created successfully.', 
-            booking: savedBooking 
-        });
+            res.status(201).json({ 
+                success: true,
+                message: 'Booking request created successfully and notification sent.', 
+                booking: savedBooking 
+            });
+
+        } catch (emailError) {
+            console.error('Email sending error:', emailError);
+            res.status(201).json({
+                success: true,
+                message: 'Booking created successfully, but email notification failed.',
+                booking: savedBooking,
+                emailError: emailError.message
+            });
+        }
 
     } catch (error) {
-        console.error('Error creating booking:', error);
+        console.error('Error in booking process:', error);
         res.status(500).json({ 
             success: false,
             message: 'Internal server error', 
