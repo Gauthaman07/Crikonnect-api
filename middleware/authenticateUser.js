@@ -18,3 +18,6 @@ const authenticateUser = (req, res, next) => {
         res.status(401).json({ message: 'You are not logged in. Please log in to continue.' });
     }
 };
+
+
+module.exports = authenticateUser;
