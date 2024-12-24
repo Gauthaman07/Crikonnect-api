@@ -1,10 +1,11 @@
 const Team = require('../models/team'); // Ensure Team model is imported
 const Ground = require('../models/ground'); // Import the Ground model
+const GroundBooking = require('../models/groundBooking');
 
 const getAvailableGrounds = async (req, res) => {
     try {
-        const userId = req.user.id; // Assuming user authentication middleware provides `req.user`
-        const { location } = req.query; // Filter by location if provided
+        const userId = req.user.id;
+        const { location } = req.query;
 
         // Fetch the user's team and populate their ground if it exists
         const userTeam = await Team.findOne({ createdBy: userId }).populate('groundId');
@@ -16,7 +17,28 @@ const getAvailableGrounds = async (req, res) => {
         let yourGround = null;
 
         if (userTeam.hasOwnGround && userTeam.groundId) {
-            // Prepare user's ground details
+            // Fetch pending bookings for your ground
+            const pendingBookings = await GroundBooking.find({
+                groundId: userTeam.groundId._id,
+                status: 'pending'
+            })
+            .populate('bookedByTeam', 'teamName')  // Get team name who requested
+            .sort({ bookedDate: 1 });  // Sort by date ascending
+
+            // Format bookings for response
+            const formattedBookings = pendingBookings.map(booking => ({
+                bookingId: booking._id,
+                teamName: booking.bookedByTeam.teamName,
+                date: booking.bookedDate.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                }),
+                timeSlot: booking.timeSlot,
+                status: booking.status
+            }));
+
+            // Prepare user's ground details with bookings
             yourGround = {
                 groundName: userTeam.groundId.groundName,
                 description: userTeam.groundId.description,
@@ -25,6 +47,7 @@ const getAvailableGrounds = async (req, res) => {
                 facilities: userTeam.groundId.facilities,
                 location: userTeam.groundId.location,
                 fee: userTeam.groundId.fee,
+                pendingBookings: formattedBookings  // Add pending bookings to response
             };
         }
 
@@ -34,7 +57,7 @@ const getAvailableGrounds = async (req, res) => {
             'groundName description groundMaplink image facilities location fee createdBy'
         );
 
-        // Separate the user's own ground from other grounds (for ground-owning teams)
+        // Separate the user's own ground from other grounds
         const otherGrounds = allGrounds.filter(
             (ground) => !yourGround || ground._id.toString() !== userTeam.groundId._id.toString()
         );
