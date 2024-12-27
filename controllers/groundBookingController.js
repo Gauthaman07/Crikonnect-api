@@ -7,7 +7,6 @@ const transporter = require('../config/emailConfig');
 
 exports.bookGround = async (req, res) => {
     try {
-        // Check if user is authenticated
         if (!req.user || !req.user.id) {
             return res.status(401).json({ message: 'Authentication required' });
         }
@@ -18,14 +17,6 @@ exports.bookGround = async (req, res) => {
         // Validation checks for required fields
         if (!groundId || !bookedDate || !timeSlot || !bookedByTeam) {
             return res.status(400).json({ message: 'Required fields are missing.' });
-        }
-
-        // Validate time slot
-        const validSlots = ['morning', 'afternoon'];
-        if (!validSlots.includes(timeSlot)) {
-            return res.status(400).json({ 
-                message: 'Invalid time slot. Must be either "Morning" or "Afternoon".' 
-            });
         }
 
         // Check if ground exists
@@ -45,7 +36,7 @@ exports.bookGround = async (req, res) => {
 
         if (!team) {
             return res.status(403).json({ 
-                message: 'You are not authorized to book for this team.' 
+                message: 'You must be a member or owner of the team to make a booking.' 
             });
         }
 
@@ -74,12 +65,9 @@ exports.bookGround = async (req, res) => {
 
         const savedBooking = await newBooking.save();
 
-        // const ground = await Ground.findById(groundId);
+        // Get ground owner's details for email
         const groundOwner = await User.findById(ground.createdBy);
         
-        // Fetch requesting team's details
-        const requestingTeam = await Team.findById(bookedByTeam);
-
         // Format date for email
         const formattedDate = new Date(bookedDate).toLocaleDateString('en-US', {
             weekday: 'long',
@@ -88,6 +76,7 @@ exports.bookGround = async (req, res) => {
             day: 'numeric'
         });
 
+        // Send email notification
         try {
             console.log('Attempting to send email...');
             console.log('Ground owner email:', groundOwner.email);
