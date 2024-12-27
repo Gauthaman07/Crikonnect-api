@@ -140,3 +140,111 @@ exports.bookGround = async (req, res) => {
         });
     }
 };
+
+
+
+// Add this to your existing groundBookingController.js
+exports.updateBookingStatus = async (req, res) => {
+    try {
+        const { bookingId } = req.params;
+        const { status } = req.body; // 'booked' or 'rejected'
+        const userId = req.user.id;
+
+        // Validate status
+        if (!['booked', 'rejected'].includes(status)) {
+            return res.status(400).json({ 
+                message: 'Invalid status. Must be either "booked" or "rejected".' 
+            });
+        }
+
+        // Find the booking
+        const booking = await GroundBooking.findById(bookingId)
+            .populate('groundId')
+            .populate('bookedByTeam');
+
+        if (!booking) {
+            return res.status(404).json({ message: 'Booking not found.' });
+        }
+
+        // Verify that the user owns the ground
+        const userTeam = await Team.findOne({ 
+            createdBy: userId,
+            groundId: booking.groundId._id
+        });
+
+        if (!userTeam) {
+            return res.status(403).json({ 
+                message: 'You are not authorized to update this booking.' 
+            });
+        }
+
+        // Update booking status
+        booking.status = status;
+        await booking.save();
+
+        // Find the team that requested the booking to get their details
+        const requestingTeam = await Team.findById(booking.bookedByTeam._id)
+            .populate('createdBy', 'email'); // Get team creator's email
+
+        // Format date for email
+        const formattedDate = new Date(booking.bookedDate).toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        // Send email notification
+        try {
+            const mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: requestingTeam.createdBy.email,
+                subject: `Ground Booking ${status === 'booked' ? 'Accepted' : 'Rejected'}`,
+                html: `
+                    <h2>Booking ${status === 'booked' ? 'Accepted' : 'Rejected'}</h2>
+                    <p>Your ground booking request has been ${status === 'booked' ? 'accepted' : 'rejected'}.</p>
+                    <h3>Booking Details:</h3>
+                    <ul>
+                        <li><strong>Ground:</strong> ${booking.groundId.groundName}</li>
+                        <li><strong>Date:</strong> ${formattedDate}</li>
+                        <li><strong>Time Slot:</strong> ${booking.timeSlot}</li>
+                        ${status === 'booked' ? `
+                        <li><strong>Fee:</strong> ${booking.groundId.fee}</li>
+                        <li><strong>Location:</strong> ${booking.groundId.location}</li>
+                        <li><strong>Ground Map Link:</strong> <a href="${booking.groundId.groundMaplink}">Click here</a></li>
+                        ` : ''}
+                    </ul>
+                    ${status === 'booked' ? 
+                        '<p>Please arrive on time and follow all ground rules.</p>' : 
+                        '<p>Please try booking another available slot or ground.</p>'
+                    }
+                `
+            };
+
+            await transporter.sendMail(mailOptions);
+
+            res.status(200).json({
+                success: true,
+                message: `Booking ${status === 'booked' ? 'accepted' : 'rejected'} successfully and notification sent.`,
+                booking
+            });
+
+        } catch (emailError) {
+            console.error('Email sending error:', emailError);
+            res.status(200).json({
+                success: true,
+                message: `Booking ${status === 'booked' ? 'accepted' : 'rejected'} successfully but email notification failed.`,
+                booking,
+                emailError: emailError.message
+            });
+        }
+
+    } catch (error) {
+        console.error('Error updating booking status:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Internal server error', 
+            error: error.message 
+        });
+    }
+};
