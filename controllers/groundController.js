@@ -57,6 +57,25 @@ const getAvailableGrounds = async (req, res) => {
             'groundName description groundMaplink image facilities location fee createdBy'
         );
 
+        // Fetch bookings made by the user for all grounds
+        const userBookings = await GroundBooking.find({
+            bookedByTeam: userTeam._id, // Assuming userTeam._id is the team ID
+            status: { $in: ['pending', 'booked'] } // Fetch only relevant statuses
+        }).populate('groundId');
+
+        // Format user bookings for response
+        const formattedUserBookings = userBookings.map(booking => ({
+            bookingId: booking._id,
+            groundName: booking.groundId.groundName,
+            date: booking.bookedDate.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            }),
+            timeSlot: booking.timeSlot,
+            status: booking.status
+        }));
+
         // Separate the user's own ground from other grounds
         const otherGrounds = allGrounds.filter(
             (ground) => !yourGround || ground._id.toString() !== userTeam.groundId._id.toString()
@@ -68,11 +87,13 @@ const getAvailableGrounds = async (req, res) => {
                 message: 'Grounds fetched successfully.',
                 yourGround,
                 otherGrounds,
+                userBookings: formattedUserBookings // Add user bookings to response
             });
         } else {
             res.status(200).json({
                 message: 'Grounds fetched successfully.',
                 grounds: allGrounds,
+                userBookings: formattedUserBookings // Add user bookings to response
             });
         }
     } catch (error) {
