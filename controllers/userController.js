@@ -6,17 +6,17 @@ const Ground = require('../models/ground');
 
 // Signup logic (already implemented)
 exports.signup = async (req, res) => {
-    const {mobile, email, password, confirmPassword } = req.body;
+    const { name, mobile, email, password } = req.body;
 
-    if (password !== confirmPassword) {
-        return res.status(400).json({ message: "Passwords don't match" });
-    }
+    // if (password !== confirmPassword) {
+    //     return res.status(400).json({ message: "Passwords don't match" });
+    // }
 
     try {
         const mobileExists = await User.findOne({ mobile });
         if (mobileExists) {
             return res.status(400).json({ message: "Mobile number already registered" });
-        }        
+        }
 
         const userExists = await User.findOne({ email });
         if (userExists) {
@@ -25,6 +25,7 @@ exports.signup = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = new User({
+            name,
             mobile,
             email,
             password: hashedPassword
@@ -49,7 +50,7 @@ exports.login = async (req, res) => {
             $or: [{ email: emailOrMobile }, { mobile: emailOrMobile }],
         });
         console.log("User found:", user);
-        
+
 
         if (!user) {
             return res.status(400).json({ message: "Invalid credentials" });
@@ -64,9 +65,9 @@ exports.login = async (req, res) => {
         // Generate a JWT token
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
-        res.status(200).json({ 
-            token, 
-            user: { email: user.email, mobile: user.mobile } 
+        res.status(200).json({
+            token,
+            user: { email: user.email, mobile: user.mobile }
         });
     } catch (error) {
         console.error(error);
@@ -82,7 +83,7 @@ exports.getProfile = async (req, res) => {
         // Get user details (excluding password)
         const user = await User.findById(req.user.id)
             .select('-password');
-        
+
         // Find team where user is either creator or member
         const team = await Team.findOne({
             $or: [
@@ -95,6 +96,7 @@ exports.getProfile = async (req, res) => {
         const profileData = {
             user: {
                 id: user._id,
+                name: user.name,
                 email: user.email,
                 mobile: user.mobile,
                 createdAt: user.createdAt
@@ -125,10 +127,10 @@ exports.getProfile = async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching user profile:', error);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: 'Error fetching user profile',
-            error: error.message 
+            error: error.message
         });
     }
 };
