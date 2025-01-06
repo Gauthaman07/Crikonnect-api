@@ -163,7 +163,7 @@ exports.updateBookingStatus = async (req, res) => {
 
         if (!userTeam) {
             return res.status(403).json({ 
-                message: 'You are not authorized to update this booking.' 
+                message: 'Only the ground owner can approve or reject bookings.' 
             });
         }
 
