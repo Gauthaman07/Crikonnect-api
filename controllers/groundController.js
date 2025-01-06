@@ -18,15 +18,15 @@ const getAvailableGrounds = async (req, res) => {
 
         if (userTeam.hasOwnGround && userTeam.groundId) {
             // Fetch pending bookings for your ground
-            const pendingBookings = await GroundBooking.find({
+            const allBookings = await GroundBooking.find({
                 groundId: userTeam.groundId._id,
-                status: 'pending'
+                status: { $in: ['pending', 'booked'] }
             })
             .populate('bookedByTeam', 'teamName')  // Get team name who requested
             .sort({ bookedDate: 1 });  // Sort by date ascending
 
             // Format bookings for response
-            const formattedBookings = pendingBookings.map(booking => ({
+            const formattedBookings = allBookings.map(booking => ({
                 bookingId: booking._id,
                 teamName: booking.bookedByTeam.teamName,
                 date: booking.bookedDate.toLocaleDateString('en-US', {
