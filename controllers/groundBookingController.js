@@ -104,7 +104,7 @@ exports.bookGround = async (req, res) => {
                 {
                     channel: 'whatsapp',
                     source: process.env.GUPSHUP_SOURCE_NUMBER,
-                    destination: groundOwner.phoneNumber, // Ensure this is in the correct format
+                    destination: `+91${groundOwner.mobile}`, // Ensure this is in the correct format
                     message: `You have a new booking request for your ground.\n\n*Booking Details:*\n- Team: ${team.teamName}\n- Date: ${formattedDate}\n- Time Slot: ${timeSlot}\n- Ground: ${ground.groundName}\n\nPlease log in to your account to approve or reject the request.`,
                     "src.name": 'Crickonnect' // Correctly formatted key
                 },
@@ -147,8 +147,8 @@ exports.updateBookingStatus = async (req, res) => {
 
         // Validate status
         if (!['booked', 'rejected'].includes(status)) {
-            return res.status(400).json({ 
-                message: 'Invalid status. Must be either "booked" or "rejected".' 
+            return res.status(400).json({
+                message: 'Invalid status. Must be either "booked" or "rejected".'
             });
         }
 
@@ -162,14 +162,14 @@ exports.updateBookingStatus = async (req, res) => {
         }
 
         // Verify that the user owns the ground
-        const userTeam = await Team.findOne({ 
+        const userTeam = await Team.findOne({
             createdBy: userId,
             groundId: booking.groundId._id
         });
 
         if (!userTeam) {
-            return res.status(403).json({ 
-                message: 'Only the ground owner can approve or reject bookings.' 
+            return res.status(403).json({
+                message: 'Only the ground owner can approve or reject bookings.'
             });
         }
 
@@ -209,8 +209,8 @@ exports.updateBookingStatus = async (req, res) => {
                         <li><strong>Ground Map Link:</strong> <a href="${booking.groundId.groundMaplink}">Click here</a></li>
                         ` : ''}
                     </ul>
-                    ${status === 'booked' ? 
-                        '<p>Please arrive on time and follow all ground rules.</p>' : 
+                    ${status === 'booked' ?
+                        '<p>Please arrive on time and follow all ground rules.</p>' :
                         '<p>Please try booking another available slot or ground.</p>'
                     }
                 `
@@ -236,10 +236,10 @@ exports.updateBookingStatus = async (req, res) => {
 
     } catch (error) {
         console.error('Error updating booking status:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Internal server error', 
-            error: error.message 
+            message: 'Internal server error',
+            error: error.message
         });
     }
 };
