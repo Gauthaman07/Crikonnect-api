@@ -97,6 +97,8 @@ exports.bookGround = async (req, res) => {
 
         await transporter.sendMail(mailOptions);
 
+        console.log('GUPSHUP_API_KEY:', process.env.GUPSHUP_API_KEY);
+        console.log('GUPSHUP_SOURCE_NUMBER:', process.env.GUPSHUP_SOURCE_NUMBER);
         // Send WhatsApp notification using Gupshup
         try {
             const gupshupResponse = await axios.post(
@@ -128,9 +130,9 @@ exports.bookGround = async (req, res) => {
                 }
             );
 
-            console.log('WhatsApp message sent:', gupshupResponse.data);
-        } catch (whatsappError) {
-            console.error('Failed to send WhatsApp message:', whatsappError.message);
+            console.log('WhatsApp message sent successfully:', gupshupResponse.data);
+        } catch (error) {
+            console.error('Failed to send WhatsApp message:', error.response?.data || error.message)
         }
 
         res.status(201).json({
