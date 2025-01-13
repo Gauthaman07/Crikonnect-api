@@ -3,7 +3,7 @@ const Ground = require('../models/ground');
 const Team = require('../models/team');
 const User = require('../models/User');
 const transporter = require('../config/emailConfig');
-
+const axios = require('axios');
 
 exports.bookGround = async (req, res) => {
     try {
@@ -35,8 +35,8 @@ exports.bookGround = async (req, res) => {
         });
 
         if (!team) {
-            return res.status(403).json({ 
-                message: 'You must be a member or owner of the team to make a booking.' 
+            return res.status(403).json({
+                message: 'You must be a member or owner of the team to make a booking.'
             });
         }
 
@@ -49,8 +49,8 @@ exports.bookGround = async (req, res) => {
         });
 
         if (existingBooking) {
-            return res.status(400).json({ 
-                message: 'This time slot is already booked or pending.' 
+            return res.status(400).json({
+                message: 'This time slot is already booked or pending.'
             });
         }
 
@@ -65,10 +65,10 @@ exports.bookGround = async (req, res) => {
 
         const savedBooking = await newBooking.save();
 
-        // Get ground owner's details for email
+        // Get ground owner's details for email and WhatsApp
         const groundOwner = await User.findById(ground.createdBy);
-        
-        // Format date for email
+
+        // Format date for notifications
         const formattedDate = new Date(bookedDate).toLocaleDateString('en-US', {
             weekday: 'long',
             year: 'numeric',
@@ -77,55 +77,61 @@ exports.bookGround = async (req, res) => {
         });
 
         // Send email notification
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: groundOwner.email,
+            subject: 'New Ground Booking Request',
+            html: `
+                <h2>New Booking Request</h2>
+                <p>You have received a new booking request for your ground.</p>
+                <h3>Booking Details:</h3>
+                <ul>
+                    <li><strong>Team:</strong> ${team.teamName}</li>
+                    <li><strong>Date:</strong> ${formattedDate}</li>
+                    <li><strong>Time Slot:</strong> ${timeSlot}</li>
+                    <li><strong>Ground:</strong> ${ground.groundName}</li>
+                </ul>
+                <p>Please log in to your account to approve or reject this request.</p>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        // Send WhatsApp notification using Gupshup
         try {
-            console.log('Attempting to send email...');
-            console.log('Ground owner email:', groundOwner.email);
-            
-            const mailOptions = {
-                from: process.env.EMAIL_USER,
-                to: groundOwner.email,
-                subject: 'New Ground Booking Request',
-                html: `
-                    <h2>New Booking Request</h2>
-                    <p>You have received a new booking request for your ground.</p>
-                    <h3>Booking Details:</h3>
-                    <ul>
-                        <li><strong>Team:</strong> ${team.teamName}</li>
-                        <li><strong>Date:</strong> ${formattedDate}</li>
-                        <li><strong>Time Slot:</strong> ${timeSlot}</li>
-                        <li><strong>Ground:</strong> ${ground.groundName}</li>
-                    </ul>
-                    <p>Please log in to your account to approve or reject this request.</p>
-                `
-            };
+            const gupshupResponse = await axios.post(
+                'https://api.gupshup.io/sm/api/v1/msg',
+                {
+                    channel: 'whatsapp',
+                    source: process.env.GUPSHUP_SOURCE_NUMBER,
+                    destination: groundOwner.phoneNumber, // Ensure this is in the correct format
+                    message: `You have a new booking request for your ground.\n\n*Booking Details:*\n- Team: ${team.teamName}\n- Date: ${formattedDate}\n- Time Slot: ${timeSlot}\n- Ground: ${ground.groundName}\n\nPlease log in to your account to approve or reject the request.`,
+                    "src.name": 'Crickonnect' // Correctly formatted key
+                },
+                {
+                    headers: {
+                        apikey: process.env.GUPSHUP_API_KEY,
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                }
+            );
 
-            console.log('Mail options:', mailOptions);
-
-            const info = await transporter.sendMail(mailOptions);
-            console.log('Email sent successfully:', info);
-
-            res.status(201).json({ 
-                success: true,
-                message: 'Booking request created successfully and notification sent.', 
-                booking: savedBooking 
-            });
-
-        } catch (emailError) {
-            console.error('Email sending error:', emailError);
-            res.status(201).json({
-                success: true,
-                message: 'Booking created successfully, but email notification failed.',
-                booking: savedBooking,
-                emailError: emailError.message
-            });
+            console.log('WhatsApp message sent:', gupshupResponse.data);
+        } catch (whatsappError) {
+            console.error('Failed to send WhatsApp message:', whatsappError.message);
         }
 
+        res.status(201).json({
+            success: true,
+            message: 'Booking request created successfully. Notifications sent.',
+            booking: savedBooking
+        });
     } catch (error) {
         console.error('Error in booking process:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Internal server error', 
-            error: error.message 
+            message: 'Internal server error',
+            error: error.message
         });
     }
 };
