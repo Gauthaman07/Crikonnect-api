@@ -104,14 +104,26 @@ exports.bookGround = async (req, res) => {
                 {
                     channel: 'whatsapp',
                     source: process.env.GUPSHUP_SOURCE_NUMBER,
-                    destination: `+91${groundOwner.mobile}`, // Ensure this is in the correct format
-                    message: `You have a new booking request for your ground.\n\n*Booking Details:*\n- Team: ${team.teamName}\n- Date: ${formattedDate}\n- Time Slot: ${timeSlot}\n- Ground: ${ground.groundName}\n\nPlease log in to your account to approve or reject the request.`,
-                    "src.name": 'Crickonnect' // Correctly formatted key
+                    destination: `+91${groundOwner.mobile}`, // Add correct format
+                    message: {
+                        type: "template",
+                        template: {
+                            name: "ground_booking_request",
+                            language: "en",
+                            params: [
+                                groundOwner.name, // Customer Name
+                                team.teamName,    // Team Name
+                                ground.groundName, // Ground
+                                formattedDate,    // Date
+                                timeSlot          // Session
+                            ]
+                        }
+                    }
                 },
                 {
                     headers: {
                         apikey: process.env.GUPSHUP_API_KEY,
-                        'Content-Type': 'application/x-www-form-urlencoded'
+                        'Content-Type': 'application/json'
                     }
                 }
             );
