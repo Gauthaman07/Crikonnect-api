@@ -102,38 +102,32 @@ exports.bookGround = async (req, res) => {
         // Send WhatsApp notification using Gupshup
         try {
             const gupshupResponse = await axios.post(
-                ' https://api.gupshup.io/wa/api/v1/template/msg',
-                {
-                    channel: 'whatsapp',
-                    source: process.env.GUPSHUP_SOURCE_NUMBER,
-                    destination: `+91${groundOwner.mobile}`, // Add correct format
-                    message: {
-                        type: "template",
-                        template: {
-                            name: "ground_booking_request",
-                            language: "en",
-                            params: [
-                                groundOwner.name, // Customer Name
-                                team.teamName,    // Team Name
-                                ground.groundName, // Ground
-                                formattedDate,    // Date
-                                timeSlot          // Session
-                            ]
-                        }
-                    }
-                },
+                'https://api.gupshup.io/wa/api/v1/template/msg',
+                new URLSearchParams({
+                    apiKey: process.env.GUPSHUP_API_KEY,
+                    source: process.env.GUPSHUP_SOURCE_NUMBER, 
+                    destination: `+91${groundOwner.mobile}`, 
+                    templateId: "ground_booking_request",  // Make sure this ID is correct
+                    params: JSON.stringify([
+                        groundOwner.name, 
+                        team.teamName, 
+                        ground.groundName, 
+                        formattedDate, 
+                        timeSlot
+                    ])
+                }).toString(), 
                 {
                     headers: {
-                        apikey: process.env.GUPSHUP_API_KEY,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/x-www-form-urlencoded'
                     }
                 }
             );
-
-            console.log('WhatsApp message sent successfully:', gupshupResponse.data);
+        
+            console.log('WhatsApp template message sent successfully:', gupshupResponse.data);
         } catch (error) {
-            console.error('Failed to send WhatsApp message:', error.response?.data || error.message)
+            console.error('Failed to send WhatsApp template message:', error.response?.data || error.message);
         }
+        
 
         res.status(201).json({
             success: true,
