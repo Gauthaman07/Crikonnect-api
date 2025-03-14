@@ -102,7 +102,7 @@ exports.bookGround = async (req, res) => {
         // Send WhatsApp notification using Gupshup
         try {
             const gupshupResponse = await axios.post(
-                'https://api.gupshup.io/wa/api/v1/msg',
+                ' https://api.gupshup.io/wa/api/v1/template/msg',
                 {
                     channel: 'whatsapp',
                     source: process.env.GUPSHUP_SOURCE_NUMBER,
