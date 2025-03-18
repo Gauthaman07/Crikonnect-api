@@ -72,6 +72,7 @@ const getAvailableGrounds = async (req, res) => {
         const formattedUserBookings = userBookings.map(booking => ({
             bookingId: booking._id,
             groundName: booking.groundId.groundName,
+            groundImg: booking.groundId.image,
             teamName: userTeam.teamName,
             date: booking.bookedDate.toLocaleDateString('en-US', {
                 year: 'numeric',
