@@ -22,13 +22,14 @@ const getAvailableGrounds = async (req, res) => {
                 groundId: userTeam.groundId._id,
                 status: { $in: ['pending', 'booked'] }
             })
-            .populate('bookedByTeam', 'teamName')  // Get team name who requested
+            .populate('bookedByTeam', 'teamName', 'teamLogo')  // Get team name who requested
             .sort({ bookedDate: 1 });  // Sort by date ascending
 
             // Format bookings for response
             const formattedBookings = allBookings.map(booking => ({
                 bookingId: booking._id,
                 teamName: booking.bookedByTeam.teamName,
+                teamLogo: booking.bookedByTeam.teamLogo,
                 date: booking.bookedDate.toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
