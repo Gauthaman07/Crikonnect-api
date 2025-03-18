@@ -18,12 +18,16 @@ const getAvailableGrounds = async (req, res) => {
 
         if (userTeam.hasOwnGround && userTeam.groundId) {
             // Fetch pending bookings for your ground
+            // Fetch pending bookings for your ground
             const allBookings = await GroundBooking.find({
                 groundId: userTeam.groundId._id,
                 status: { $in: ['pending', 'booked'] }
             })
-            .populate('bookedByTeam', 'teamName', 'teamLogo')  // Get team name who requested
-            .sort({ bookedDate: 1 });  // Sort by date ascending
+                .populate({
+                    path: 'bookedByTeam',
+                    select: 'teamName teamLogo'  // Select only these fields from the Team model
+                })
+                .sort({ bookedDate: 1 });  // Sort by date ascending
 
             // Format bookings for response
             const formattedBookings = allBookings.map(booking => ({
