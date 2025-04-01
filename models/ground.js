@@ -10,6 +10,7 @@ const groundSchema = new Schema({
     location: { type: String, required: true },
     fee: { type: Number, required: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    ownedByTeam: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', default: null },
 });
 
 const Ground = mongoose.model('Ground', groundSchema);

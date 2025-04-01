@@ -58,9 +58,9 @@ const getAvailableGrounds = async (req, res) => {
 
         // Fetch all grounds, filtered by location if provided
         const groundsQuery = location ? { location } : {};
-        const allGrounds = await Ground.find(groundsQuery).select(
-            'groundName description groundMaplink image facilities location fee createdBy'
-        );
+        const allGrounds = await Ground.find(groundsQuery)
+        .populate({ path: 'ownedByTeam', select: 'teamName teamLogo' }) 
+        .select('groundName description groundMaplink image facilities location fee createdBy ownedByTeam');
 
         // Fetch bookings made by the user for all grounds
         const userBookings = await GroundBooking.find({
