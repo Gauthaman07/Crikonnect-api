@@ -145,3 +145,34 @@ const getNextMatchDate = (round, matchDays) => {
     nextMatchDay.setDate(today.getDate() + (round * 7)); // Example: schedule matches weekly
     return nextMatchDay;
 };
+
+
+
+exports.getTournamentsByLocation = async (req, res) => {
+    try {
+        const { location } = req.query; // Get the location from query parameters
+
+        if (!location) {
+            return res.status(400).json({ message: 'Location query parameter is required.' });
+        }
+
+        // Find tournaments that match the specified location
+        const tournaments = await Tournament.find({ location: new RegExp(location, 'i') }); // Case-insensitive search
+
+        if (tournaments.length === 0) {
+            return res.status(404).json({ message: 'No tournaments found for the specified location.' });
+        }
+
+        res.status(200).json({
+            success: true,
+            tournaments
+        });
+    } catch (error) {
+        console.error('Error retrieving tournaments:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
