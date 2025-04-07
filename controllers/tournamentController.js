@@ -146,26 +146,45 @@ const getNextMatchDate = (round, matchDays) => {
     return nextMatchDay;
 };
 
-
-
 exports.getTournamentsByLocation = async (req, res) => {
     try {
-        const { location } = req.query; // Get the location from query parameters
+        const { location, userId } = req.query; // Get both location and optional userId
 
         if (!location) {
             return res.status(400).json({ message: 'Location query parameter is required.' });
         }
 
-        // Find tournaments that match the specified location
-        const tournaments = await Tournament.find({ location: new RegExp(location, 'i') }); // Case-insensitive search
+        // Find all tournaments for this location
+        const allTournaments = await Tournament.find({ location: new RegExp(location, 'i') });
 
-        if (tournaments.length === 0) {
+        if (allTournaments.length === 0) {
             return res.status(404).json({ message: 'No tournaments found for the specified location.' });
         }
 
+        // If userId is provided, separate user tournaments from others
+        if (userId) {
+            const userTournaments = allTournaments.filter(tournament => 
+                tournament.createdBy && tournament.createdBy.toString() === userId.toString()
+            );
+            
+            const otherTournaments = allTournaments.filter(tournament => 
+                !tournament.createdBy || tournament.createdBy.toString() !== userId.toString()
+            );
+            
+            return res.status(200).json({
+                success: true,
+                userTournaments,
+                otherTournaments,
+                totalCount: allTournaments.length,
+                userCount: userTournaments.length
+            });
+        }
+        
+        // If no userId, return all tournaments together
         res.status(200).json({
             success: true,
-            tournaments
+            tournaments: allTournaments,
+            totalCount: allTournaments.length
         });
     } catch (error) {
         console.error('Error retrieving tournaments:', error);
@@ -176,3 +195,7 @@ exports.getTournamentsByLocation = async (req, res) => {
         });
     }
 };
+
+
+
+
