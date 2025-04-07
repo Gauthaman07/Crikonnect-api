@@ -147,10 +147,10 @@ const getNextMatchDate = (round, matchDays) => {
 };
 
 
-
 exports.getTournamentsByLocation = async (req, res) => {
     try {
         const { location } = req.query; // Get the location from query parameters
+        const userId = req.user ? req.user._id : null; // Get the user ID from the authenticated user
 
         if (!location) {
             return res.status(400).json({ message: 'Location query parameter is required.' });
@@ -163,6 +163,30 @@ exports.getTournamentsByLocation = async (req, res) => {
             return res.status(404).json({ message: 'No tournaments found for the specified location.' });
         }
 
+        // If user is authenticated, prioritize their tournaments
+        if (userId) {
+            // Sort tournaments: user's tournaments first, then the rest
+            const sortedTournaments = tournaments.sort((a, b) => {
+                // Convert creator IDs to strings for comparison
+                const creatorA = a.creator.toString();
+                const creatorB = b.creator.toString();
+                const userIdStr = userId.toString();
+                
+                // If tournament A is created by the user and B is not, A comes first
+                if (creatorA === userIdStr && creatorB !== userIdStr) return -1;
+                // If tournament B is created by the user and A is not, B comes first
+                if (creatorB === userIdStr && creatorA !== userIdStr) return 1;
+                // Otherwise, maintain original order
+                return 0;
+            });
+
+            return res.status(200).json({
+                success: true,
+                tournaments: sortedTournaments
+            });
+        }
+
+        // If user is not authenticated, return tournaments without prioritization
         res.status(200).json({
             success: true,
             tournaments

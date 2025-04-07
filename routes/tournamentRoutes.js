@@ -6,7 +6,8 @@ const authenticateUser = require('../middleware/authenticateUser');
 // Existing POST route for creating tournaments
 router.post('/', authenticateUser, createTournament);
 
-// New GET route for retrieving tournaments by location
-router.get('/', getTournamentsByLocation);
+// Modified GET route to include authentication but make it optional
+// This allows the route to access req.user when available without requiring authentication
+router.get('/', authenticateUser, getTournamentsByLocation);
 
 module.exports = router;
