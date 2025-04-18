@@ -4,6 +4,7 @@ const Team = require('../models/team');
 const User = require('../models/User');
 const transporter = require('../config/emailConfig');
 const axios = require('axios');
+const { sendPushNotification } = require('../services/notificationService');
 
 exports.bookGround = async (req, res) => {
     try {
@@ -75,6 +76,35 @@ exports.bookGround = async (req, res) => {
             month: 'long',
             day: 'numeric'
         });
+
+        // Send push notification to ground owner
+        try {
+            const notificationTitle = 'New Ground Booking Request';
+            const notificationBody = `${team.teamName} has requested to book ${ground.groundName} on ${formattedDate} for ${timeSlot}`;
+            
+            // Additional data to send with notification
+            const notificationData = {
+                bookingId: savedBooking._id.toString(),
+                teamId: team._id.toString(),
+                teamName: team.teamName,
+                groundId: ground._id.toString(),
+                groundName: ground.groundName,
+                date: formattedDate,
+                timeSlot: timeSlot,
+                type: 'new_booking_request'
+            };
+            
+            // Send push notification to ground owner
+            await sendPushNotification(
+                groundOwner._id,
+                { title: notificationTitle, body: notificationBody },
+                notificationData
+            );
+            
+            console.log('Push notification sent successfully to ground owner');
+        } catch (pushError) {
+            console.error('Error sending push notification to ground owner:', pushError);
+        }
 
         // Send email notification
         const mailOptions = {
@@ -187,7 +217,7 @@ exports.updateBookingStatus = async (req, res) => {
 
         // Find the team that requested the booking to get their details
         const requestingTeam = await Team.findById(booking.bookedByTeam._id)
-            .populate('createdBy', 'email'); // Get team creator's email
+            .populate('createdBy', 'email _id'); // Get team creator's email and ID
 
         // Format date for email
         const formattedDate = new Date(booking.bookedDate).toLocaleDateString('en-US', {
@@ -196,6 +226,34 @@ exports.updateBookingStatus = async (req, res) => {
             month: 'long',
             day: 'numeric'
         });
+
+        // Send push notification
+        try {
+            const notificationTitle = `Ground Booking ${status === 'booked' ? 'Accepted' : 'Rejected'}`;
+            const notificationBody = `Your booking request for ${booking.groundId.groundName} on ${formattedDate} has been ${status === 'booked' ? 'accepted' : 'rejected'}.`;
+            
+            // Additional data to send with notification
+            const notificationData = {
+                bookingId: booking._id.toString(),
+                groundId: booking.groundId._id.toString(),
+                groundName: booking.groundId.groundName,
+                date: formattedDate,
+                timeSlot: booking.timeSlot,
+                status: status,
+                type: 'booking_update'
+            };
+            
+            // Send push notification to the team creator
+            await sendPushNotification(
+                requestingTeam.createdBy._id,
+                { title: notificationTitle, body: notificationBody },
+                notificationData
+            );
+            
+            console.log('Push notification sent successfully');
+        } catch (pushError) {
+            console.error('Error sending push notification:', pushError);
+        }
 
         // Send email notification
         try {
@@ -228,7 +286,7 @@ exports.updateBookingStatus = async (req, res) => {
 
             res.status(200).json({
                 success: true,
-                message: `Booking ${status === 'booked' ? 'accepted' : 'rejected'} successfully and notification sent.`,
+                message: `Booking ${status === 'booked' ? 'accepted' : 'rejected'} successfully and notifications sent.`,
                 booking
             });
 
