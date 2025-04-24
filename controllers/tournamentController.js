@@ -188,3 +188,107 @@ exports.getTournamentsByLocation = async (req, res) => {
         });
     }
 };
+
+
+
+// POST /api/tournaments/:tournamentId/registrations
+exports.registerForTournament = async (req, res) => {
+    try {
+        const { tournamentId } = req.params;
+        const userId = req.user.id;
+        
+        // Get registration data from request body
+        const {
+            teamName,
+            captainName,
+            contactInfo,
+            numberOfPlayers,
+            preferredSlot,
+            rulesAgreement
+        } = req.body;
+
+        // Validate required fields
+        if (!teamName || !captainName || !contactInfo || !rulesAgreement) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Missing required fields'
+            });
+        }
+
+        // Check if tournament exists and is open for registration
+        const tournament = await Tournament.findById(tournamentId);
+        if (!tournament) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tournament not found'
+            });
+        }
+
+        if (tournament.registrationStatus !== 'open') {
+            return res.status(400).json({
+                success: false,
+                message: 'Tournament registration is closed'
+            });
+        }
+
+        // Check if the team is already registered
+        const existingRegistration = await TournamentRegistration.findOne({
+            tournament: tournamentId,
+            teamName: teamName
+        });
+
+        if (existingRegistration) {
+            return res.status(400).json({
+                success: false,
+                message: 'Team is already registered for this tournament'
+            });
+        }
+
+        // Create registration
+        const registration = new TournamentRegistration({
+            tournament: tournamentId,
+            registeredBy: userId,
+            teamName,
+            captainName,
+            contactInfo,
+            numberOfPlayers: numberOfPlayers || 0,
+            preferredSlot: preferredSlot || '',
+            rulesAgreement: Boolean(rulesAgreement),
+            status: 'pending', // Can be 'pending', 'approved', 'rejected'
+            registrationDate: new Date()
+        });
+
+        await registration.save();
+
+        // Optional: Send notification to tournament organizer
+        const organizer = await User.findById(tournament.createdBy);
+        if (organizer && organizer.fcmToken) {
+            await sendPushNotification(
+                organizer._id,
+                { 
+                    title: 'New Tournament Registration', 
+                    body: `${teamName} has registered for your tournament: ${tournament.name}`
+                },
+                {
+                    type: 'tournament_registration',
+                    tournamentId: tournament._id.toString(),
+                    registrationId: registration._id.toString()
+                }
+            );
+        }
+
+        res.status(201).json({
+            success: true,
+            message: 'Tournament registration successful',
+            registration
+        });
+
+    } catch (error) {
+        console.error('Error registering for tournament:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
