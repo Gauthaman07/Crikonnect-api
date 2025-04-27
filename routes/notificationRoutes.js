@@ -1,15 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth'); // Assuming you have this middleware
+const authenticateUser = require('../middleware/authenticateUser');// Assuming you have this middleware
 const { registerFCMToken, unregisterFCMToken, sendManualNotification } = require('../controllers/notificationController');
 
 // Register FCM token
-router.post('/register-token', auth, registerFCMToken);
+router.post('/register-token', authenticateUser, registerFCMToken);
 
 // Unregister FCM token
-router.delete('/unregister-token', auth, unregisterFCMToken);
+router.delete('/unregister-token', authenticateUser, unregisterFCMToken);
 
 // Send a manual notification (can add additional middleware for admin check)
-router.post('/send', auth, sendManualNotification);
+router.post('/send', authenticateUser, sendManualNotification);
 
 module.exports = router;
