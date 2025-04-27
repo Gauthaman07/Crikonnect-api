@@ -12,6 +12,7 @@ const cloudinary = require('cloudinary').v2;
 const groundRoutes = require('./routes/groundRoutes');
 const groundBookingRoutes = require('./routes/groundBookingRoutes');
 const tournamentRoutes = require('./routes/tournamentRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 
 dotenv.config();
@@ -57,6 +58,7 @@ app.use('/api/user', userProfileRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/grounds', groundRoutes);
 app.use('/api/ground-booking', groundBookingRoutes);
+app.use('/api/notifications', notificationRoutes);
 // Test route
 app.get('/', (req, res) => {
     res.send('Welcome to the Sports Booking API!');
