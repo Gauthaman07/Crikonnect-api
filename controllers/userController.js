@@ -134,3 +134,30 @@ exports.getProfile = async (req, res) => {
         });
     }
 };
+
+
+// Save or update FCM token
+exports.updateFcmToken = async (req, res) => {
+    const userId = req.user.id; // Make sure this is coming from your auth middleware
+    const { fcmToken } = req.body;
+
+    if (!fcmToken) {
+        return res.status(400).json({ message: 'FCM token is required' });
+    }
+
+    try {
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { fcmToken },
+            { new: true }
+        ).select('-password');
+
+        res.status(200).json({
+            message: 'FCM token updated successfully',
+            user
+        });
+    } catch (error) {
+        console.error('Error updating FCM token:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
