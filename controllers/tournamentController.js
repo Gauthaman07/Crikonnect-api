@@ -138,15 +138,6 @@ const generateFixtures = async (tournament) => {
     }
 };
 
-// Helper function to get the next match date based on round and match days preference
-const getNextMatchDate = (round, matchDays) => {
-    const today = new Date();
-    const nextMatchDay = new Date(today);
-    nextMatchDay.setDate(today.getDate() + (round * 7)); // Example: schedule matches weekly
-    return nextMatchDay;
-};
-
-
 exports.getTournamentsByLocation = async (req, res) => {
     try {
         const { location } = req.query; // Get the location from query parameters
@@ -168,22 +159,17 @@ exports.getTournamentsByLocation = async (req, res) => {
         let otherTournaments = [];
 
         if (userId) {
-            // Debug logging to identify the issue
-            console.log('User ID:', userId, 'Type:', typeof userId);
-            
+            // Filter tournaments where the user is the creator
             userTournaments = tournaments.filter(tournament => {
                 const tournamentCreator = tournament.createdBy;
-                console.log('Tournament Creator:', tournamentCreator, 'Type:', typeof tournamentCreator);
-                
-                // Handle both String and ObjectId comparisons
                 return tournamentCreator && 
                        (tournamentCreator.toString() === userId.toString() ||
                         tournamentCreator === userId.toString());
             });
             
+            // Filter other tournaments
             otherTournaments = tournaments.filter(tournament => {
                 const tournamentCreator = tournament.createdBy;
-                // Handle both String and ObjectId comparisons
                 return !tournamentCreator || 
                        (tournamentCreator.toString() !== userId.toString() &&
                         tournamentCreator !== userId.toString());
@@ -192,10 +178,14 @@ exports.getTournamentsByLocation = async (req, res) => {
             otherTournaments = tournaments; // If user is not authenticated, all tournaments are "other"
         }
 
+        // Optional: Populate additional tournament details like the createdBy user or ground details if needed
+        const populatedUserTournaments = await Tournament.populate(userTournaments, { path: 'createdBy' });
+        const populatedOtherTournaments = await Tournament.populate(otherTournaments, { path: 'createdBy' });
+
         res.status(200).json({
             success: true,
-            userTournaments, // Tournaments created by the user
-            otherTournaments // All other tournaments
+            userTournaments: populatedUserTournaments, // Tournaments created by the user
+            otherTournaments: populatedOtherTournaments // All other tournaments
         });
     } catch (error) {
         console.error('Error retrieving tournaments:', error);
@@ -206,6 +196,7 @@ exports.getTournamentsByLocation = async (req, res) => {
         });
     }
 };
+
 
 
 
