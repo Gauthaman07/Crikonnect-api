@@ -168,8 +168,26 @@ exports.getTournamentsByLocation = async (req, res) => {
         let otherTournaments = [];
 
         if (userId) {
-            userTournaments = tournaments.filter(tournament => tournament.createdBy.toString() === userId.toString());
-            otherTournaments = tournaments.filter(tournament => tournament.createdBy.toString() !== userId.toString());
+            // Debug logging to identify the issue
+            console.log('User ID:', userId, 'Type:', typeof userId);
+            
+            userTournaments = tournaments.filter(tournament => {
+                const tournamentCreator = tournament.createdBy;
+                console.log('Tournament Creator:', tournamentCreator, 'Type:', typeof tournamentCreator);
+                
+                // Handle both String and ObjectId comparisons
+                return tournamentCreator && 
+                       (tournamentCreator.toString() === userId.toString() ||
+                        tournamentCreator === userId.toString());
+            });
+            
+            otherTournaments = tournaments.filter(tournament => {
+                const tournamentCreator = tournament.createdBy;
+                // Handle both String and ObjectId comparisons
+                return !tournamentCreator || 
+                       (tournamentCreator.toString() !== userId.toString() &&
+                        tournamentCreator !== userId.toString());
+            });
         } else {
             otherTournaments = tournaments; // If user is not authenticated, all tournaments are "other"
         }
