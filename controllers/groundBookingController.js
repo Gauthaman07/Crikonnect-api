@@ -4,7 +4,7 @@ const Team = require('../models/team');
 const User = require('../models/User');
 const transporter = require('../config/emailConfig');
 const axios = require('axios');
-const { sendManualNotification } = require('../services/notificationService');
+const { sendPushNotification } = require('../services/notificationService');
 
 exports.bookGround = async (req, res) => {
     try {
@@ -95,11 +95,11 @@ exports.bookGround = async (req, res) => {
             };
             
             // Send push notification to ground owner
-            await sendManualNotification(
-                groundOwner._id,
-                { title: notificationTitle, body: notificationBody },
-                notificationData
-            );
+        await sendPushNotification(
+  groundOwner._id,
+  { title: notificationTitle, body: notificationBody },
+  notificationData
+);
             
             console.log('Push notification sent successfully to ground owner');
         } catch (pushError) {

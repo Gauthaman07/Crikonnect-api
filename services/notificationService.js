@@ -8,36 +8,28 @@ const User = require('../models/User');
  * @param {object} data - Additional data payload for the notification
  * @returns {Promise<boolean>} - Whether notification was sent successfully
  */
-exports.sendPushNotification = async (userId, notification, data = {}) => {
+const sendPushNotification = async (userId, notification, data = {}) => {
   try {
-    // Get the user from database to access their FCM token
     const user = await User.findById(userId);
-    
     if (!user || !user.fcmToken) {
-      console.log(`No FCM token found for user ${userId}`);
+      console.log(`User not found or no FCM token`);
       return false;
     }
-    
-    // Convert all data values to strings (FCM requirement)
-    const stringifiedData = {};
-    Object.keys(data).forEach(key => {
-      stringifiedData[key] = String(data[key]);
-    });
-    
+
     const message = {
+      token: user.fcmToken,
       notification: {
         title: notification.title,
-        body: notification.body
+        body: notification.body,
       },
-      data: stringifiedData,
-      token: user.fcmToken
+      data,
     };
-    
-    const response = await admin.messaging().send(message);
-    console.log('Successfully sent push notification:', response);
+
+    await admin.messaging().send(message);
+    console.log('Push notification sent to:', user.fcmToken);
     return true;
-  } catch (error) {
-    console.error('Error sending push notification:', error);
+  } catch (err) {
+    console.error('FCM send error:', err);
     return false;
   }
 };
