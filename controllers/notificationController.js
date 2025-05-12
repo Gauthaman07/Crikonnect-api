@@ -12,7 +12,7 @@ const User = require('../models/User');
 const sendPushNotification = async (userId, notification, data = {}) => {
   try {
     // Initialize Firebase Admin
-    const firebaseAdmin = initializeFirebaseAdmin();
+    // const firebaseAdmin = initializeFirebaseAdmin();
     
     // Find user by ID to get FCM token
     const user = await User.findById(userId);
