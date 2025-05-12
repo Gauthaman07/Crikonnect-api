@@ -1,127 +1,98 @@
+const admin = require('firebase-admin');
 const User = require('../models/User');
-const { sendPushNotification, sendMultipleNotifications } = require('../services/notificationService');
+const { initializeFirebaseAdmin } = require('../config/firebaseConfig');
 
 /**
- * Register FCM token for a user
- * @route POST /api/notifications/register-token
- * @access Private
+ * Send a push notification to a single user
+ * @param {string} userId - User ID
+ * @param {Object} notification - Object containing title and body
+ * @param {Object} data - Additional data to send with notification
+ * @returns {Promise<boolean>} - Whether the notification was sent successfully
  */
-exports.registerFCMToken = async (req, res) => {
+const sendPushNotification = async (userId, notification, data = {}) => {
   try {
-    const { fcmToken } = req.body;
+    // Initialize Firebase Admin
+    const firebaseAdmin = initializeFirebaseAdmin();
     
-    if (!fcmToken) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'FCM token is required' 
-      });
+    // Find user by ID to get FCM token
+    const user = await User.findById(userId);
+    
+    // If user not found or has no FCM token, return false
+    if (!user || !user.fcmToken) {
+      console.log(`No valid FCM token found for user ${userId}`);
+      return false;
     }
     
-    // Update user with the new FCM token
-    await User.findByIdAndUpdate(
-      req.user.id,
-      { fcmToken: fcmToken },
-      { new: true }
-    );
+    // Prepare notification message
+    const message = {
+      notification: {
+        title: notification.title,
+        body: notification.body
+      },
+      data: data,
+      token: user.fcmToken
+    };
     
-    return res.status(200).json({
-      success: true,
-      message: 'FCM token registered successfully'
-    });
+    // Send notification
+    const response = await firebaseAdmin.messaging().send(message);
+    console.log('Successfully sent notification:', response);
+    return true;
   } catch (error) {
-    console.error('Error registering FCM token:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to register FCM token',
-      error: error.message
-    });
+    console.error('Error sending push notification:', error);
+    return false;
   }
 };
 
 /**
- * Unregister FCM token for a user
- * @route DELETE /api/notifications/unregister-token
- * @access Private
+ * Send push notifications to multiple users
+ * @param {Array<string>} userIds - Array of user IDs
+ * @param {Object} notification - Object containing title and body
+ * @param {Object} data - Additional data to send with notification
+ * @returns {Promise<{success: number, failure: number}>} - Count of successful and failed notifications
  */
-exports.unregisterFCMToken = async (req, res) => {
+const sendMultipleNotifications = async (userIds, notification, data = {}) => {
   try {
-    // Remove FCM token from user
-    await User.findByIdAndUpdate(
-      req.user.id,
-      { fcmToken: null },
-      { new: true }
-    );
+    // Initialize Firebase Admin
+    const firebaseAdmin = initializeFirebaseAdmin();
     
-    return res.status(200).json({
-      success: true,
-      message: 'FCM token unregistered successfully'
-    });
+    // Get FCM tokens for all specified users
+    const users = await User.find({ _id: { $in: userIds } });
+    
+    // Filter users with valid FCM tokens
+    const validTokens = users
+      .filter(user => user && user.fcmToken)
+      .map(user => user.fcmToken);
+    
+    if (validTokens.length === 0) {
+      console.log('No valid FCM tokens found');
+      return { success: 0, failure: userIds.length };
+    }
+    
+    // Prepare notification message
+    const message = {
+      notification: {
+        title: notification.title,
+        body: notification.body
+      },
+      data: data,
+      tokens: validTokens
+    };
+    
+    // Send notifications
+    const response = await firebaseAdmin.messaging().sendMulticast(message);
+    console.log(`Successfully sent ${response.successCount} notifications, failed: ${response.failureCount}`);
+    
+    return {
+      success: response.successCount,
+      failure: response.failureCount
+    };
   } catch (error) {
-    console.error('Error unregistering FCM token:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to unregister FCM token',
-      error: error.message
-    });
+    console.error('Error sending multiple push notifications:', error);
+    return { success: 0, failure: userIds.length };
   }
 };
 
-/**
- * Send a manual notification to specific users
- * @route POST /api/notifications/send
- * @access Private (admin only)
- */
-exports.sendManualNotification = async (req, res) => {
-  try {
-    const { userIds, title, body, data } = req.body;
-    
-    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'User IDs are required (array)'
-      });
-    }
-    
-    if (!title || !body) {
-      return res.status(400).json({
-        success: false, 
-        message: 'Notification title and body are required'
-      });
-    }
-    
-    // For multiple users
-    if (userIds.length > 1) {
-      const result = await sendMultipleNotifications(
-        userIds,
-        { title, body },
-        data || {}
-      );
-      
-      return res.status(200).json({
-        success: true,
-        message: `Sent ${result.success} notifications, failed: ${result.failure}`,
-        result
-      });
-    } 
-    // For a single user
-    else {
-      const success = await sendPushNotification(
-        userIds[0],
-        { title, body },
-        data || {}
-      );
-      
-      return res.status(success ? 200 : 400).json({
-        success: success,
-        message: success ? 'Notification sent successfully' : 'Failed to send notification'
-      });
-    }
-  } catch (error) {
-    console.error('Error sending manual notification:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to send notification',
-      error: error.message
-    });
-  }
-}; 
+module.exports = {
+  sendPushNotification,
+  sendMultipleNotifications
+};
