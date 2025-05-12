@@ -4,7 +4,7 @@ const Team = require('../models/team');
 const User = require('../models/User');
 const transporter = require('../config/emailConfig');
 const axios = require('axios');
-const { sendPushNotification } = require('../services/notificationService');
+const { sendManualNotification } = require('../services/notificationService');
 
 exports.bookGround = async (req, res) => {
     try {
@@ -77,10 +77,11 @@ exports.bookGround = async (req, res) => {
             day: 'numeric'
         });
 
+        // Send push notification to ground owner
         try {
             const notificationTitle = 'New Ground Booking Request';
             const notificationBody = `${team.teamName} has requested to book ${ground.groundName} on ${formattedDate} for ${timeSlot}`;
-
+            
             // Additional data to send with notification
             const notificationData = {
                 bookingId: savedBooking._id.toString(),
@@ -92,27 +93,16 @@ exports.bookGround = async (req, res) => {
                 timeSlot: timeSlot,
                 type: 'new_booking_request'
             };
-
-            // Convert all data values to strings (Firebase requirement)
-            Object.keys(notificationData).forEach(key => {
-                notificationData[key] = String(notificationData[key]);
-            });
-
+            
             // Send push notification to ground owner
-            const notificationSent = await sendPushNotification(
-                groundOwner._id.toString(),
+            await sendManualNotification(
+                groundOwner._id,
                 { title: notificationTitle, body: notificationBody },
                 notificationData
             );
-
-            // Log FCM token for debugging
-            console.log(`Sending notification to user: ${groundOwner._id.toString()}, FCM Token: ${groundOwner.fcmToken?.substring(0, 10)}...`);
-
-            console.log(notificationSent ?
-                'Push notification sent successfully to ground owner' :
-                'Failed to send push notification to ground owner');
+            
+            console.log('Push notification sent successfully to ground owner');
         } catch (pushError) {
-            // Log error but don't fail the booking creation
             console.error('Error sending push notification to ground owner:', pushError);
         }
 
@@ -145,29 +135,29 @@ exports.bookGround = async (req, res) => {
                 'https://api.gupshup.io/wa/api/v1/template/msg',
                 new URLSearchParams({
                     apiKey: process.env.GUPSHUP_API_KEY,
-                    source: process.env.GUPSHUP_SOURCE_NUMBER,
-                    destination: `+91${groundOwner.mobile}`,
+                    source: process.env.GUPSHUP_SOURCE_NUMBER, 
+                    destination: `+91${groundOwner.mobile}`, 
                     templateId: "ground_booking_request",  // Make sure this ID is correct
                     params: JSON.stringify([
-                        groundOwner.name,
-                        team.teamName,
-                        ground.groundName,
-                        formattedDate,
+                        groundOwner.name, 
+                        team.teamName, 
+                        ground.groundName, 
+                        formattedDate, 
                         timeSlot
                     ])
-                }).toString(),
+                }).toString(), 
                 {
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'
                     }
                 }
             );
-
+        
             console.log('WhatsApp template message sent successfully:', gupshupResponse.data);
         } catch (error) {
             console.error('Failed to send WhatsApp template message:', error.response?.data || error.message);
         }
-
+        
 
         res.status(201).json({
             success: true,
@@ -241,7 +231,7 @@ exports.updateBookingStatus = async (req, res) => {
         try {
             const notificationTitle = `Ground Booking ${status === 'booked' ? 'Accepted' : 'Rejected'}`;
             const notificationBody = `Your booking request for ${booking.groundId.groundName} on ${formattedDate} has been ${status === 'booked' ? 'accepted' : 'rejected'}.`;
-
+            
             // Additional data to send with notification
             const notificationData = {
                 bookingId: booking._id.toString(),
@@ -252,14 +242,14 @@ exports.updateBookingStatus = async (req, res) => {
                 status: status,
                 type: 'booking_update'
             };
-
+            
             // Send push notification to the team creator
             await sendPushNotification(
                 requestingTeam.createdBy._id,
                 { title: notificationTitle, body: notificationBody },
                 notificationData
             );
-
+            
             console.log('Push notification sent successfully');
         } catch (pushError) {
             console.error('Error sending push notification:', pushError);

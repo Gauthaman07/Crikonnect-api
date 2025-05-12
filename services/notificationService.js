@@ -1,56 +1,40 @@
-const admin = require('firebase-admin');
+const admin = require('../config/firebase');
 const User = require('../models/User');
 
-// Initialize Firebase Admin SDK if not already initialized
-const initializeFirebaseAdmin = () => {
-  if (!admin.apps.length) {
-    const serviceAccount = {
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    };
-    
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
-  }
-  return admin;
-};
-
 /**
- * Send a push notification to a single user
- * @param {string} userId - User ID
- * @param {Object} notification - Object containing title and body
- * @param {Object} data - Additional data to send with notification
- * @returns {Promise<boolean>} - Whether the notification was sent successfully
+ * Send push notification to a specific user
+ * @param {string} userId - The ID of the user to send notification to
+ * @param {object} notification - The notification object with title and body
+ * @param {object} data - Additional data payload for the notification
+ * @returns {Promise<boolean>} - Whether notification was sent successfully
  */
-const sendPushNotification = async (userId, notification, data = {}) => {
+exports.sendPushNotification = async (userId, notification, data = {}) => {
   try {
-    // Initialize Firebase Admin
-    const firebaseAdmin = initializeFirebaseAdmin();
-    
-    // Find user by ID to get FCM token
+    // Get the user from database to access their FCM token
     const user = await User.findById(userId);
     
-    // If user not found or has no FCM token, return false
     if (!user || !user.fcmToken) {
-      console.log(`No valid FCM token found for user ${userId}`);
+      console.log(`No FCM token found for user ${userId}`);
       return false;
     }
     
-    // Prepare notification message
+    // Convert all data values to strings (FCM requirement)
+    const stringifiedData = {};
+    Object.keys(data).forEach(key => {
+      stringifiedData[key] = String(data[key]);
+    });
+    
     const message = {
       notification: {
         title: notification.title,
         body: notification.body
       },
-      data: data,
+      data: stringifiedData,
       token: user.fcmToken
     };
     
-    // Send notification
-    const response = await firebaseAdmin.messaging().send(message);
-    console.log('Successfully sent notification:', response);
+    const response = await admin.messaging().send(message);
+    console.log('Successfully sent push notification:', response);
     return true;
   } catch (error) {
     console.error('Error sending push notification:', error);
@@ -59,42 +43,43 @@ const sendPushNotification = async (userId, notification, data = {}) => {
 };
 
 /**
- * Send push notifications to multiple users
- * @param {Array<string>} userIds - Array of user IDs
- * @param {Object} notification - Object containing title and body
- * @param {Object} data - Additional data to send with notification
- * @returns {Promise<{success: number, failure: number}>} - Count of successful and failed notifications
+ * Send push notification to multiple users
+ * @param {string[]} userIds - Array of user IDs to send notification to
+ * @param {object} notification - The notification object with title and body
+ * @param {object} data - Additional data payload for the notification
+ * @returns {Promise<object>} - Results of the sending operation
  */
-const sendMultipleNotifications = async (userIds, notification, data = {}) => {
+exports.sendMultipleNotifications = async (userIds, notification, data = {}) => {
   try {
-    // Initialize Firebase Admin
-    const firebaseAdmin = initializeFirebaseAdmin();
+    // Get users with FCM tokens
+    const users = await User.find({
+      _id: { $in: userIds },
+      fcmToken: { $ne: null }
+    });
     
-    // Get FCM tokens for all specified users
-    const users = await User.find({ _id: { $in: userIds } });
-    
-    // Filter users with valid FCM tokens
-    const validTokens = users
-      .filter(user => user && user.fcmToken)
-      .map(user => user.fcmToken);
-    
-    if (validTokens.length === 0) {
-      console.log('No valid FCM tokens found');
+    if (users.length === 0) {
+      console.log('No users with FCM tokens found');
       return { success: 0, failure: userIds.length };
     }
     
-    // Prepare notification message
+    // Convert all data values to strings (FCM requirement)
+    const stringifiedData = {};
+    Object.keys(data).forEach(key => {
+      stringifiedData[key] = String(data[key]);
+    });
+    
+    const tokens = users.map(user => user.fcmToken);
+    
     const message = {
       notification: {
         title: notification.title,
         body: notification.body
       },
-      data: data,
-      tokens: validTokens
+      data: stringifiedData,
+      tokens: tokens
     };
     
-    // Send notifications
-    const response = await firebaseAdmin.messaging().sendMulticast(message);
+    const response = await admin.messaging().sendMulticast(message);
     console.log(`Successfully sent ${response.successCount} notifications, failed: ${response.failureCount}`);
     
     return {
@@ -102,12 +87,7 @@ const sendMultipleNotifications = async (userIds, notification, data = {}) => {
       failure: response.failureCount
     };
   } catch (error) {
-    console.error('Error sending multiple push notifications:', error);
-    return { success: 0, failure: userIds.length };
+    console.error('Error sending multiple notifications:', error);
+    return { success: 0, failure: userIds.length, error: error.message };
   }
-};
-
-module.exports = {
-  sendPushNotification,
-  sendMultipleNotifications
 };
