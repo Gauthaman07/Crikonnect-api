@@ -1,6 +1,6 @@
 const admin = require('firebase-admin');
 const User = require('../models/User');
-const admin = require('firebase-admin');
+
 
 /**
  * Send a push notification to a single user
