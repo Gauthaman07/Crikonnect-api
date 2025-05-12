@@ -33,7 +33,7 @@ const sendPushNotification = async (userId, notification, data = {}) => {
     return false;
   }
 };
-
+module.exports = { sendPushNotification };
 /**
  * Send push notification to multiple users
  * @param {string[]} userIds - Array of user IDs to send notification to
