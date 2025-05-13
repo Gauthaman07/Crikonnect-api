@@ -138,6 +138,8 @@ const generateFixtures = async (tournament) => {
     }
 };
 
+
+
 exports.getTournamentsByLocation = async (req, res) => {
     try {
         const { location } = req.query; // Get the location from query parameters
@@ -147,45 +149,38 @@ exports.getTournamentsByLocation = async (req, res) => {
             return res.status(400).json({ message: 'Location query parameter is required.' });
         }
 
-        // Find tournaments that match the specified location
-        const tournaments = await Tournament.find({ location: new RegExp(location, 'i') }); // Case-insensitive search
+        // Find tournaments that match the specified location (case-insensitive)
+        const tournaments = await Tournament.find({ location: new RegExp(location, 'i') });
 
         if (tournaments.length === 0) {
             return res.status(404).json({ message: 'No tournaments found for the specified location.' });
         }
 
-        // Separate user's tournaments from the rest
         let userTournaments = [];
         let otherTournaments = [];
 
         if (userId) {
-            // Filter tournaments where the user is the creator
+            // Convert both IDs to strings for reliable comparison
             userTournaments = tournaments.filter(tournament => {
-                const tournamentCreator = tournament.createdBy;
-                return tournamentCreator && 
-                       (tournamentCreator.toString() === userId.toString() ||
-                        tournamentCreator === userId.toString());
+                return tournament.createdBy?.toString() === userId.toString();
             });
-            
-            // Filter other tournaments
+
             otherTournaments = tournaments.filter(tournament => {
-                const tournamentCreator = tournament.createdBy;
-                return !tournamentCreator || 
-                       (tournamentCreator.toString() !== userId.toString() &&
-                        tournamentCreator !== userId.toString());
+                return tournament.createdBy?.toString() !== userId.toString();
             });
         } else {
-            otherTournaments = tournaments; // If user is not authenticated, all tournaments are "other"
+            // If no user is logged in, consider all tournaments as 'other'
+            otherTournaments = tournaments;
         }
 
-        // Optional: Populate additional tournament details like the createdBy user or ground details if needed
+        // Populate creator info
         const populatedUserTournaments = await Tournament.populate(userTournaments, { path: 'createdBy' });
         const populatedOtherTournaments = await Tournament.populate(otherTournaments, { path: 'createdBy' });
 
         res.status(200).json({
             success: true,
-            userTournaments: populatedUserTournaments, // Tournaments created by the user
-            otherTournaments: populatedOtherTournaments // All other tournaments
+            userTournaments: populatedUserTournaments,
+            otherTournaments: populatedOtherTournaments
         });
     } catch (error) {
         console.error('Error retrieving tournaments:', error);
@@ -196,6 +191,7 @@ exports.getTournamentsByLocation = async (req, res) => {
         });
     }
 };
+
 
 
 
