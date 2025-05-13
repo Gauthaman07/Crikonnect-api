@@ -142,17 +142,20 @@ const generateFixtures = async (tournament) => {
 
 exports.getTournamentsByLocation = async (req, res) => {
     try {
-        const { location } = req.query; // Get the location from query parameters
-        const userId = req.user ? req.user._id : null; // Get the user ID from the authenticated user
+        const { location } = req.query;
+        const userId = req.user ? req.user.id : null; // Consistent with your team logic
 
         if (!location) {
             return res.status(400).json({ message: 'Location query parameter is required.' });
         }
 
-        // Find tournaments that match the specified location (case-insensitive)
-        const tournaments = await Tournament.find({ location: new RegExp(location, 'i') });
+        // Case-insensitive location match
+        const locationRegex = new RegExp(location, 'i');
 
-        if (tournaments.length === 0) {
+        // Fetch all tournaments for that location
+        const allTournaments = await Tournament.find({ location: locationRegex });
+
+        if (!allTournaments || allTournaments.length === 0) {
             return res.status(404).json({ message: 'No tournaments found for the specified location.' });
         }
 
@@ -160,37 +163,37 @@ exports.getTournamentsByLocation = async (req, res) => {
         let otherTournaments = [];
 
         if (userId) {
-            // Convert both IDs to strings for reliable comparison
-            userTournaments = tournaments.filter(tournament => {
-                return tournament.createdBy?.toString() === userId.toString();
-            });
+            // Fetch tournaments created by the user
+            userTournaments = await Tournament.find({
+                location: locationRegex,
+                createdBy: userId,
+            }).populate('createdBy');
 
-            otherTournaments = tournaments.filter(tournament => {
-                return tournament.createdBy?.toString() !== userId.toString();
-            });
+            // Fetch other tournaments (not created by the user)
+            otherTournaments = await Tournament.find({
+                location: locationRegex,
+                createdBy: { $ne: userId },
+            }).populate('createdBy');
         } else {
-            // If no user is logged in, consider all tournaments as 'other'
-            otherTournaments = tournaments;
+            // No logged-in user, so return all as "others"
+            otherTournaments = await Tournament.find({ location: locationRegex }).populate('createdBy');
         }
-
-        // Populate creator info
-        const populatedUserTournaments = await Tournament.populate(userTournaments, { path: 'createdBy' });
-        const populatedOtherTournaments = await Tournament.populate(otherTournaments, { path: 'createdBy' });
 
         res.status(200).json({
             success: true,
-            userTournaments: populatedUserTournaments,
-            otherTournaments: populatedOtherTournaments
+            userTournaments,
+            otherTournaments,
         });
     } catch (error) {
         console.error('Error retrieving tournaments:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error',
-            error: error.message
+            error: error.message,
         });
     }
 };
+
 
 
 
