@@ -52,6 +52,7 @@ exports.createTournament = async (req, res) => {
             rulesDocument,
             umpireProvided,
             lastDateToRegister,
+            autoFixtureGeneration,
             createdBy: userId
         });
 
