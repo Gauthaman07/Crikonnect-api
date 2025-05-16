@@ -204,30 +204,27 @@ exports.getTournamentsByLocation = async (req, res) => {
 
 
 // POST /api/tournaments/:tournamentId/registrations
+
 exports.registerForTournament = async (req, res) => {
     try {
         const { tournamentId } = req.params;
         const userId = req.user.id;
-        
-        // Get registration data from request body
+
         const {
-            teamName,
-            captainName,
-            contactInfo,
-            numberOfPlayers,
+            teamId,
             preferredSlot,
+            numberOfPlayers,
             rulesAgreement
         } = req.body;
 
-        // Validate required fields
-        if (!teamName || !captainName || !contactInfo || !rulesAgreement) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Missing required fields'
+        if (!teamId || !rulesAgreement) {
+            return res.status(400).json({
+                success: false,
+                message: 'teamId and rulesAgreement are required.'
             });
         }
 
-        // Check if tournament exists and is open for registration
+        // Check tournament
         const tournament = await Tournament.findById(tournamentId);
         if (!tournament) {
             return res.status(404).json({
@@ -236,50 +233,59 @@ exports.registerForTournament = async (req, res) => {
             });
         }
 
-        if (tournament.registrationStatus !== 'open') {
+        // OPTIONAL: If you're adding this later
+        if (tournament.lastDateToRegister < new Date()) {
             return res.status(400).json({
                 success: false,
-                message: 'Tournament registration is closed'
+                message: 'Registration deadline has passed'
             });
         }
 
-        // Check if the team is already registered
-        const existingRegistration = await TournamentRegistration.findOne({
+        // Check if team exists and belongs to user
+        const team = await Team.findOne({ _id: teamId, createdBy: userId });
+        if (!team) {
+            return res.status(403).json({
+                success: false,
+                message: 'Invalid team or unauthorized access'
+            });
+        }
+
+        // Check if already registered
+        const existing = await TeamTournamentRegistration.findOne({
             tournament: tournamentId,
-            teamName: teamName
+            team: teamId
         });
 
-        if (existingRegistration) {
+        if (existing) {
             return res.status(400).json({
                 success: false,
-                message: 'Team is already registered for this tournament'
+                message: 'This team has already registered for the tournament'
             });
         }
 
-        // Create registration
-        const registration = new TournamentRegistration({
+        // Register
+        const registration = new TeamTournamentRegistration({
             tournament: tournamentId,
-            registeredBy: userId,
-            teamName,
-            captainName,
-            contactInfo,
-            numberOfPlayers: numberOfPlayers || 0,
+            team: teamId,
             preferredSlot: preferredSlot || '',
-            rulesAgreement: Boolean(rulesAgreement),
-            status: 'pending', // Can be 'pending', 'approved', 'rejected'
-            registrationDate: new Date()
+            numberOfPlayers: numberOfPlayers || team.players.length || 0,
+            rulesAgreement: true
         });
 
         await registration.save();
 
-        // Optional: Send notification to tournament organizer
+        // Optional: push team into tournament.teams[] (only if needed)
+        tournament.teams.push(teamId);
+        await tournament.save();
+
+        // Notify organizer
         const organizer = await User.findById(tournament.createdBy);
         if (organizer && organizer.fcmToken) {
             await sendPushNotification(
                 organizer._id,
-                { 
-                    title: 'New Tournament Registration', 
-                    body: `${teamName} has registered for your tournament: ${tournament.name}`
+                {
+                    title: 'New Tournament Registration',
+                    body: `${team.teamName} registered for your tournament: ${tournament.tournamentName}`
                 },
                 {
                     type: 'tournament_registration',
@@ -291,7 +297,7 @@ exports.registerForTournament = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: 'Tournament registration successful',
+            message: 'Team registered successfully',
             registration
         });
 
