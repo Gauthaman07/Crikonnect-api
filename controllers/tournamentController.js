@@ -143,40 +143,43 @@ const generateFixtures = async (tournament) => {
 exports.getTournamentsByLocation = async (req, res) => {
     try {
         const { location } = req.query;
-        const userId = req.user ? req.user.id : null; // Consistent with your team logic
+        const userId = req.user ? req.user.id : null;
 
         if (!location) {
             return res.status(400).json({ message: 'Location query parameter is required.' });
         }
 
-        // Case-insensitive location match
         const locationRegex = new RegExp(location, 'i');
 
-        // Fetch all tournaments for that location
-        const allTournaments = await Tournament.find({ location: locationRegex });
+        // Filter tournaments with startDate > today
+        const tomorrow = new Date();
+        tomorrow.setHours(0, 0, 0, 0);
+        tomorrow.setDate(tomorrow.getDate() + 1);
 
-        if (!allTournaments || allTournaments.length === 0) {
-            return res.status(404).json({ message: 'No tournaments found for the specified location.' });
-        }
+        const baseQuery = {
+            location: locationRegex,
+            startDate: { $gte: tomorrow }, // Only future tournaments
+        };
 
         let userTournaments = [];
         let otherTournaments = [];
 
         if (userId) {
-            // Fetch tournaments created by the user
             userTournaments = await Tournament.find({
-                location: locationRegex,
+                ...baseQuery,
                 createdBy: userId,
             }).populate('createdBy');
 
-            // Fetch other tournaments (not created by the user)
             otherTournaments = await Tournament.find({
-                location: locationRegex,
+                ...baseQuery,
                 createdBy: { $ne: userId },
             }).populate('createdBy');
         } else {
-            // No logged-in user, so return all as "others"
-            otherTournaments = await Tournament.find({ location: locationRegex }).populate('createdBy');
+            otherTournaments = await Tournament.find(baseQuery).populate('createdBy');
+        }
+
+        if (userTournaments.length === 0 && otherTournaments.length === 0) {
+            return res.status(404).json({ message: 'No upcoming tournaments found for the specified location.' });
         }
 
         res.status(200).json({
