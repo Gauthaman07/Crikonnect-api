@@ -1,9 +1,9 @@
 const PDFDocument = require('pdfkit');
 const streamifier = require('streamifier');
 const cloudinary = require('../config/cloudinary'); // adjust if path is different
-const Tournament = require('../models/Tournament');
-const Team = require('../models/Team');
-const Match = require('../models/Match'); // optional if you want to save matches
+const Tournament = require('../models/tournament');
+const Team = require('../models/team');
+const Match = require('../models/match'); // optional if you want to save matches
 
 const generateFixturePDF = async (req, res) => {
     try {

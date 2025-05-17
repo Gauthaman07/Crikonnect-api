@@ -1,6 +1,6 @@
-const Tournament = require('../models/Tournament');
-const Team = require('../models/Team');
-const Match = require('../models/Match'); // Import the Match model
+const Tournament = require('../models/tournament');
+const Team = require('../models/team');
+const Match = require('../models/match'); // Import the Match model
 const TeamTournamentRegistration = require('../models/TeamTournamentRegistration');
 const User = require('../models/User');
 const { sendPushNotification } = require('../services/notificationService');
