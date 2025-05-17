@@ -283,10 +283,12 @@ exports.registerForTournament = async (req, res) => {
         const registration = new TeamTournamentRegistration({
             tournament: tournamentId,
             team: teamId,
+            registeredBy: userId, // ✅ Add this line
             preferredSlot: preferredSlot || '',
             numberOfPlayers: numberOfPlayers || team.players.length || 0,
             rulesAgreement: true
         });
+
 
         await registration.save();
 
