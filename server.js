@@ -64,6 +64,9 @@ app.get('/', (req, res) => {
     res.send('Welcome to the Sports Booking API!');
 });
 app.use('/api/tournaments', tournamentRoutes);
+app.use('/api/fixtures', require('./routes/fixtureRoutes'));
+
+
 // MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/sportsBooking';
 mongoose.connect(MONGO_URI)

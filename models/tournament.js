@@ -26,6 +26,8 @@ const tournamentSchema = new Schema({
     umpireProvided: { type: Boolean, default: false },
     lastDateToRegister: { type: Date, required: true },
     autoFixtureGeneration: { type: Boolean, default: false },
+    fixturePDFUrl: { type: String, default: null },             // ✅ NEW
+    autoFixtureGenerated: { type: Boolean, default: false },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     teams: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Team' }]
 }, { timestamps: true });

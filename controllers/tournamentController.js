@@ -1,9 +1,13 @@
-const Tournament = require('../models/tournament');
-const Team = require('../models/team');
-const Match = require('../models/match'); // Import the Match model
+const Tournament = require('../models/Tournament');
+const Team = require('../models/Team');
+const Match = require('../models/Match'); // Import the Match model
 const TeamTournamentRegistration = require('../models/TeamTournamentRegistration');
 const User = require('../models/User');
 const { sendPushNotification } = require('../services/notificationService');
+const { generateFixturePDFForAutoCall } = require('./fixtureController'); // adjust the path if needed
+
+
+
 
 exports.createTournament = async (req, res) => {
     try {
@@ -89,70 +93,109 @@ exports.createTournament = async (req, res) => {
 };
 
 
+
 const generateFixtures = async (tournament) => {
     const registrations = await TeamTournamentRegistration.find({
         tournament: tournament._id,
-        status: 'approved' // Use 'pending' if auto-approved
+        status: 'approved'
     }).populate('team');
 
-    const teams = registrations.map(r => r.team);
-
-    const matchDays = tournament.matchDaysPreference.split(','); // e.g., ['Sunday']
-    const sessionTimes = tournament.sessionsAvailable; // e.g., ['morning', 'afternoon']
+    let teams = registrations.map(r => r.team);
 
     if (teams.length < 2) {
         console.log('Not enough teams to generate fixtures');
         return;
     }
 
-    if (tournament.tournamentType === 'knockout') {
-        let roundTeams = [...teams];
-        let round = 1;
+    // Shuffle teams randomly
+    teams = teams.sort(() => Math.random() - 0.5);
 
-        while (roundTeams.length > 1) {
-            const matches = [];
+    const fixtures = [];
 
-            for (let i = 0; i < roundTeams.length; i += 2) {
-                if (i + 1 < roundTeams.length) {
-                    const matchDate = getNextMatchDate(round, matchDays); // You need to define this
-                    const timeSlot = sessionTimes[Math.floor(Math.random() * sessionTimes.length)];
-                    const venue = tournament.groundName;
-
-                    matches.push(new Match({
-                        tournamentId: tournament._id,
-                        team1: roundTeams[i]._id,
-                        team2: roundTeams[i + 1]._id,
-                        matchDate,
-                        timeSlot,
-                        venue
-                    }));
-                }
-            }
-
-            await Match.insertMany(matches);
-            roundTeams = matches.map(match => match.team1); // For now assume team1 wins
-            round++;
-        }
-
-    } else if (tournament.tournamentType === 'round-robin') {
-        for (let i = 0; i < teams.length; i++) {
-            for (let j = i + 1; j < teams.length; j++) {
-                const matchDate = getNextMatchDate(1, matchDays); // Simplified
-                const timeSlot = sessionTimes[Math.floor(Math.random() * sessionTimes.length)];
-                const venue = tournament.groundName;
-
-                await Match.create({
-                    tournamentId: tournament._id,
-                    team1: teams[i]._id,
-                    team2: teams[j]._id,
-                    matchDate,
-                    timeSlot,
-                    venue
-                });
-            }
+    for (let i = 0; i < teams.length; i += 2) {
+        if (i + 1 < teams.length) {
+            fixtures.push({
+                team1: teams[i].teamName,
+                team2: teams[i + 1].teamName
+            });
+        } else {
+            // Odd team out gets a bye
+            fixtures.push({
+                team1: teams[i].teamName,
+                team2: 'BYE'
+            });
         }
     }
+
+    return fixtures; // We'll use this for PDF generation
 };
+
+
+
+// const generateFixtures = async (tournament) => {
+//     const registrations = await TeamTournamentRegistration.find({
+//         tournament: tournament._id,
+//         status: 'approved' // Use 'pending' if auto-approved
+//     }).populate('team');
+
+//     const teams = registrations.map(r => r.team);
+
+//     const matchDays = tournament.matchDaysPreference.split(','); // e.g., ['Sunday']
+//     const sessionTimes = tournament.sessionsAvailable; // e.g., ['morning', 'afternoon']
+
+//     if (teams.length < 2) {
+//         console.log('Not enough teams to generate fixtures');
+//         return;
+//     }
+
+//     if (tournament.tournamentType === 'knockout') {
+//         let roundTeams = [...teams];
+//         let round = 1;
+
+//         while (roundTeams.length > 1) {
+//             const matches = [];
+
+//             for (let i = 0; i < roundTeams.length; i += 2) {
+//                 if (i + 1 < roundTeams.length) {
+//                     const matchDate = getNextMatchDate(round, matchDays); // You need to define this
+//                     const timeSlot = sessionTimes[Math.floor(Math.random() * sessionTimes.length)];
+//                     const venue = tournament.groundName;
+
+//                     matches.push(new Match({
+//                         tournamentId: tournament._id,
+//                         team1: roundTeams[i]._id,
+//                         team2: roundTeams[i + 1]._id,
+//                         matchDate,
+//                         timeSlot,
+//                         venue
+//                     }));
+//                 }
+//             }
+
+//             await Match.insertMany(matches);
+//             roundTeams = matches.map(match => match.team1); // For now assume team1 wins
+//             round++;
+//         }
+
+//     } else if (tournament.tournamentType === 'round-robin') {
+//         for (let i = 0; i < teams.length; i++) {
+//             for (let j = i + 1; j < teams.length; j++) {
+//                 const matchDate = getNextMatchDate(1, matchDays); // Simplified
+//                 const timeSlot = sessionTimes[Math.floor(Math.random() * sessionTimes.length)];
+//                 const venue = tournament.groundName;
+
+//                 await Match.create({
+//                     tournamentId: tournament._id,
+//                     team1: teams[i]._id,
+//                     team2: teams[j]._id,
+//                     matchDate,
+//                     timeSlot,
+//                     venue
+//                 });
+//             }
+//         }
+//     }
+// };
 
 
 
@@ -295,6 +338,20 @@ exports.registerForTournament = async (req, res) => {
         // Optional: push team into tournament.teams[] (only if needed)
         tournament.teams.push(teamId);
         await tournament.save();
+
+        // ✅ Auto-generate fixture if all teams are filled
+        if (
+            tournament.teams.length === tournament.numberOfTeams &&
+            !tournament.autoFixtureGenerated
+        ) {
+            try {
+                await generateFixturePDFForAutoCall(tournament._id);
+                console.log('✅ Fixture PDF generated and uploaded to Cloudinary.');
+            } catch (fixtureErr) {
+                console.error('⚠️ Error generating fixture PDF:', fixtureErr);
+            }
+        }
+
 
         // Notify organizer
         const organizer = await User.findById(tournament.createdBy);
