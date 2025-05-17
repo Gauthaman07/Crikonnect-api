@@ -112,20 +112,24 @@ const generateFixturePDFForAutoCall = async (tournamentId) => {
         doc.on('end', async () => {
             const buffer = Buffer.concat(pdfBuffer);
 
-            const uploadStream = cloudinary.uploader.upload_stream(
-                { resource_type: 'raw', folder: 'tournament_fixtures' },
-                async (error, result) => {
-                    if (error) {
-                        console.error('Cloudinary upload error:', error);
-                        return;
-                    }
+          const uploadStream = cloudinary.uploader.upload_stream(
+  {
+    resource_type: 'raw',
+    folder: 'tournament_fixtures',
+    public_id: `fixture_${tournament._id}.pdf` // <- add .pdf extension
+  },
+  async (error, result) => {
+    if (error) {
+      console.error('Cloudinary upload error:', error);
+      return;
+    }
 
-                    // Update tournament with PDF URL
-                    tournament.fixturePDFUrl = result.secure_url;
-                    tournament.autoFixtureGenerated = true;
-                    await tournament.save();
-                }
-            );
+    tournament.fixturePDFUrl = result.secure_url;
+    tournament.autoFixtureGenerated = true;
+    await tournament.save();
+  }
+);
+
 
             streamifier.createReadStream(buffer).pipe(uploadStream);
         });
