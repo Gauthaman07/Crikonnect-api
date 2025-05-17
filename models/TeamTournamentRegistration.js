@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const teamTournamentRegistrationSchema = new Schema({
+const TeamTournamentRegistrationSchema = new Schema({
     tournament: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Tournament',
@@ -40,4 +40,9 @@ const teamTournamentRegistrationSchema = new Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('TeamTournamentRegistration', teamTournamentRegistrationSchema);
+
+
+
+
+const TeamTournamentRegistration = mongoose.model('TeamTournamentRegistration', TeamTournamentRegistrationSchema);
+module.exports = TeamTournamentRegistration;

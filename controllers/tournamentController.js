@@ -1,6 +1,9 @@
 const Tournament = require('../models/tournament');
 const Team = require('../models/team');
 const Match = require('../models/match'); // Import the Match model
+const TeamTournamentRegistration = require('../models/TeamTournamentRegistration');
+
+
 
 exports.createTournament = async (req, res) => {
     try {
@@ -85,24 +88,35 @@ exports.createTournament = async (req, res) => {
     }
 };
 
-// Function to generate fixtures based on tournament type
+
 const generateFixtures = async (tournament) => {
-    const teams = await Team.find({ _id: { $in: tournament.teams } }); // Fetch teams participating in the tournament
-    const matchDays = tournament.matchDaysPreference.split(','); // Assuming it's a comma-separated string
+    const registrations = await TeamTournamentRegistration.find({
+        tournament: tournament._id,
+        status: 'approved' // Use 'pending' if auto-approved
+    }).populate('team');
+
+    const teams = registrations.map(r => r.team);
+
+    const matchDays = tournament.matchDaysPreference.split(','); // e.g., ['Sunday']
     const sessionTimes = tournament.sessionsAvailable; // e.g., ['morning', 'afternoon']
 
+    if (teams.length < 2) {
+        console.log('Not enough teams to generate fixtures');
+        return;
+    }
+
     if (tournament.tournamentType === 'knockout') {
-        // Knockout logic
         let roundTeams = [...teams];
         let round = 1;
 
         while (roundTeams.length > 1) {
             const matches = [];
+
             for (let i = 0; i < roundTeams.length; i += 2) {
                 if (i + 1 < roundTeams.length) {
-                    const matchDate = getNextMatchDate(round, matchDays);
+                    const matchDate = getNextMatchDate(round, matchDays); // You need to define this
                     const timeSlot = sessionTimes[Math.floor(Math.random() * sessionTimes.length)];
-                    const venue = tournament.groundName; // Assuming a single venue for simplicity
+                    const venue = tournament.groundName;
 
                     matches.push(new Match({
                         tournamentId: tournament._id,
@@ -114,15 +128,16 @@ const generateFixtures = async (tournament) => {
                     }));
                 }
             }
-            await Match.insertMany(matches); // Save all matches for this round
-            roundTeams = matches.map(match => match.team1); // Advance winners (for simplicity, we assume team1 wins)
+
+            await Match.insertMany(matches);
+            roundTeams = matches.map(match => match.team1); // For now assume team1 wins
             round++;
         }
+
     } else if (tournament.tournamentType === 'round-robin') {
-        // Round-robin logic
         for (let i = 0; i < teams.length; i++) {
             for (let j = i + 1; j < teams.length; j++) {
-                const matchDate = getNextMatchDate(1, matchDays); // For simplicity, all matches on the same day
+                const matchDate = getNextMatchDate(1, matchDays); // Simplified
                 const timeSlot = sessionTimes[Math.floor(Math.random() * sessionTimes.length)];
                 const venue = tournament.groundName;
 
@@ -138,6 +153,7 @@ const generateFixtures = async (tournament) => {
         }
     }
 };
+
 
 
 
