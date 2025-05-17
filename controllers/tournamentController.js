@@ -3,7 +3,7 @@ const Team = require('../models/team');
 const Match = require('../models/match'); // Import the Match model
 const TeamTournamentRegistration = require('../models/TeamTournamentRegistration');
 const User = require('../models/User');
-
+const { sendPushNotification } = require('../services/notificationService');
 
 exports.createTournament = async (req, res) => {
     try {
