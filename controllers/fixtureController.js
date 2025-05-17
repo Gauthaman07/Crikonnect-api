@@ -1,6 +1,6 @@
 const PDFDocument = require('pdfkit');
 const streamifier = require('streamifier');
-const cloudinary = require('../config/cloudinary'); // adjust if path is different
+const cloudinary = require('../config/cloudinaryConfig'); // adjust if path is different
 const Tournament = require('../models/tournament');
 const Team = require('../models/team');
 const Match = require('../models/match'); // optional if you want to save matches
