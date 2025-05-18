@@ -1,5 +1,5 @@
-const Team = require('../models/team'); // Ensure Team model is imported
-const Ground = require('../models/ground'); // Import the Ground model
+const Team = require('../models/team');
+const Ground = require('../models/ground');
 const GroundBooking = require('../models/groundBooking');
 
 const getAvailableGrounds = async (req, res) => {
@@ -7,37 +7,35 @@ const getAvailableGrounds = async (req, res) => {
         const userId = req.user.id;
         const { location } = req.query;
 
-        // Fetch the user's team and populate their ground if it exists
+        // Get user's team and its ground
         const userTeam = await Team.findOne({ createdBy: userId }).populate('groundId');
 
         if (!userTeam) {
             return res.status(404).json({ message: 'User has not created a team yet.' });
         }
 
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         let yourGround = null;
 
         if (userTeam.hasOwnGround && userTeam.groundId) {
-            // Fetch pending bookings for your ground
-            // Fetch pending bookings for your ground
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
             const allBookings = await GroundBooking.find({
                 groundId: userTeam.groundId._id,
                 status: { $in: ['pending', 'booked'] },
-                bookedDate: { $gte: today } // ✅ Filter for today and future
+                bookedDate: { $gte: today }
             })
                 .populate({
                     path: 'bookedByTeam',
-                    select: 'teamName teamLogo'  // Select only these fields from the Team model
+                    select: 'teamName teamLogo'
                 })
-                .sort({ bookedDate: 1 });  // Sort by date ascending
+                .sort({ bookedDate: 1 });
 
-            // Format bookings for response
             const formattedBookings = allBookings.map(booking => ({
                 bookingId: booking._id,
-                teamName: booking.bookedByTeam.teamName,
-                teamLogo: booking.bookedByTeam.teamLogo,
-                date: booking.bookedDate.toLocaleDateString('en-US', {
+                teamName: booking.bookedByTeam?.teamName || 'Unknown Team',
+                teamLogo: booking.bookedByTeam?.teamLogo || null,
+                date: booking.bookedDate?.toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric'
@@ -46,40 +44,38 @@ const getAvailableGrounds = async (req, res) => {
                 status: booking.status
             }));
 
-            // Prepare user's ground details with bookings
             yourGround = {
-                groundName: userTeam.groundId.groundName,
-                description: userTeam.groundId.description,
-                groundMaplink: userTeam.groundId.groundMaplink,
-                image: userTeam.groundId.image,
-                facilities: userTeam.groundId.facilities,
-                location: userTeam.groundId.location,
-                fee: userTeam.groundId.fee,
-                pendingBookings: formattedBookings  // Add pending bookings to response
+                groundName: userTeam.groundId?.groundName || 'Unnamed Ground',
+                description: userTeam.groundId?.description || '',
+                groundMaplink: userTeam.groundId?.groundMaplink || '',
+                image: userTeam.groundId?.image || '',
+                facilities: userTeam.groundId?.facilities || [],
+                location: userTeam.groundId?.location || '',
+                fee: userTeam.groundId?.fee || 0,
+                pendingBookings: formattedBookings
             };
         }
 
-        // Fetch all grounds, filtered by location if provided
+        // Get all grounds (optionally filter by location)
         const groundsQuery = location ? { location } : {};
         const allGrounds = await Ground.find(groundsQuery)
             .populate({ path: 'ownedByTeam', select: 'teamName teamLogo' })
             .select('groundName description groundMaplink image facilities location fee createdBy ownedByTeam');
 
-        // Fetch bookings made by the user for all grounds
+        // Get this user's team bookings
         const userBookings = await GroundBooking.find({
-            bookedByTeam: userTeam._id, // Assuming userTeam._id is the team ID
-            status: { $in: ['pending', 'booked'] }, // Fetch only relevant statuses
-             bookedDate: { $gte: today },
+            bookedByTeam: userTeam._id,
+            status: { $in: ['pending', 'booked'] },
+            bookedDate: { $gte: today }
         }).populate('groundId');
 
-        // Format user bookings for response
         const formattedUserBookings = userBookings.map(booking => ({
             bookingId: booking._id,
-            groundName: booking.groundId.groundName,
-            groundImg: booking.groundId.image,
-            groundFee: booking.groundId.fee,
+            groundName: booking.groundId?.groundName || 'Unknown Ground',
+            groundImg: booking.groundId?.image || '',
+            groundFee: booking.groundId?.fee || 0,
             teamName: userTeam.teamName,
-            date: booking.bookedDate.toLocaleDateString('en-US', {
+            date: booking.bookedDate?.toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric'
@@ -88,29 +84,28 @@ const getAvailableGrounds = async (req, res) => {
             status: booking.status
         }));
 
-        // Separate the user's own ground from other grounds
-        const otherGrounds = allGrounds.filter(
-            (ground) => !yourGround || ground._id.toString() !== userTeam.groundId._id.toString()
+        const otherGrounds = allGrounds.filter(ground =>
+            !yourGround || ground._id.toString() !== userTeam.groundId?._id?.toString()
         );
 
-        // Response
+        // ✅ Send safe structured response
         if (yourGround) {
-            res.status(200).json({
+            return res.status(200).json({
                 message: 'Grounds fetched successfully.',
                 yourGround,
                 otherGrounds,
-                userBookings: formattedUserBookings // Add user bookings to response
+                userBookings: formattedUserBookings
             });
         } else {
-            res.status(200).json({
+            return res.status(200).json({
                 message: 'Grounds fetched successfully.',
                 grounds: allGrounds,
-                userBookings: formattedUserBookings // Add user bookings to response
+                userBookings: formattedUserBookings
             });
         }
     } catch (error) {
-        console.error('Error fetching grounds:', error);
-        res.status(500).json({ message: 'Internal server error', error: error.message });
+        console.error('🔥 Error fetching grounds:', error);
+        return res.status(500).json({ message: 'Internal server error', error: error.message });
     }
 };
 
