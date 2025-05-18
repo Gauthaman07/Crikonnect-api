@@ -19,9 +19,12 @@ const getAvailableGrounds = async (req, res) => {
         if (userTeam.hasOwnGround && userTeam.groundId) {
             // Fetch pending bookings for your ground
             // Fetch pending bookings for your ground
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
             const allBookings = await GroundBooking.find({
                 groundId: userTeam.groundId._id,
-                status: { $in: ['pending', 'booked'] }
+                status: { $in: ['pending', 'booked'] },
+                bookedDate: { $gte: today } // ✅ Filter for today and future
             })
                 .populate({
                     path: 'bookedByTeam',
@@ -59,13 +62,14 @@ const getAvailableGrounds = async (req, res) => {
         // Fetch all grounds, filtered by location if provided
         const groundsQuery = location ? { location } : {};
         const allGrounds = await Ground.find(groundsQuery)
-        .populate({ path: 'ownedByTeam', select: 'teamName teamLogo' }) 
-        .select('groundName description groundMaplink image facilities location fee createdBy ownedByTeam');
+            .populate({ path: 'ownedByTeam', select: 'teamName teamLogo' })
+            .select('groundName description groundMaplink image facilities location fee createdBy ownedByTeam');
 
         // Fetch bookings made by the user for all grounds
         const userBookings = await GroundBooking.find({
             bookedByTeam: userTeam._id, // Assuming userTeam._id is the team ID
-            status: { $in: ['pending', 'booked'] } // Fetch only relevant statuses
+            status: { $in: ['pending', 'booked'] }, // Fetch only relevant statuses
+             bookedDate: { $gte: today },
         }).populate('groundId');
 
         // Format user bookings for response
