@@ -67,14 +67,23 @@ const getAvailableGrounds = async (req, res) => {
             bookedByTeam: userTeam._id,
             status: { $in: ['pending', 'booked'] },
             bookedDate: { $gte: today }
-        }).populate('groundId');
+        })
+            .populate({
+                path: 'groundId',
+                populate: {
+                    path: 'ownedByTeam',
+                    select: 'teamName teamLogo'
+                }
+            });
+
 
         const formattedUserBookings = userBookings.map(booking => ({
             bookingId: booking._id,
             groundName: booking.groundId?.groundName || 'Unknown Ground',
             groundImg: booking.groundId?.image || '',
             groundFee: booking.groundId?.fee || 0,
-            teamName: userTeam.teamName,
+            teamName: booking.groundId?.ownedByTeam?.teamName || 'Unknown Owner',
+            teamLogo: booking.groundId?.ownedByTeam?.teamLogo || null,
             date: booking.bookedDate?.toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'long',
@@ -83,6 +92,9 @@ const getAvailableGrounds = async (req, res) => {
             timeSlot: booking.timeSlot,
             status: booking.status
         }));
+
+
+
 
         const otherGrounds = allGrounds.filter(ground =>
             !yourGround || ground._id.toString() !== userTeam.groundId?._id?.toString()
