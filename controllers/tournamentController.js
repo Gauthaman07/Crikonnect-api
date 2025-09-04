@@ -276,10 +276,10 @@ exports.registerForTournament = async (req, res) => {
             rulesAgreement
         } = req.body;
 
-        if (!teamId || !rulesAgreement) {
+        if (!teamId) {
             return res.status(400).json({
                 success: false,
-                message: 'teamId and rulesAgreement are required.'
+                message: 'teamId is required.'
             });
         }
 
@@ -329,7 +329,7 @@ exports.registerForTournament = async (req, res) => {
             registeredBy: userId, // ✅ Add this line
             preferredSlot: preferredSlot || '',
             numberOfPlayers: numberOfPlayers || team.players.length || 0,
-            rulesAgreement: true
+            rulesAgreement: rulesAgreement || true // Default to true if not provided
         });
 
 
