@@ -369,3 +369,87 @@ exports.updateBookingStatus = async (req, res) => {
         });
     }
 };
+
+// Get user's bookings (bookings made by the user's teams)
+exports.getUserBookings = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Find all teams where user is either creator or member
+        const userTeams = await Team.find({
+            $or: [
+                { createdBy: userId },
+                { members: userId }
+            ]
+        }).select('_id teamName');
+
+        if (userTeams.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: 'No teams found for this user',
+                bookings: []
+            });
+        }
+
+        // Get team IDs
+        const teamIds = userTeams.map(team => team._id);
+
+        // Find all bookings made by user's teams
+        const bookings = await GroundBooking.find({
+            bookedByTeam: { $in: teamIds }
+        })
+        .populate({
+            path: 'groundId',
+            select: 'groundName location fee groundMaplink ownedByTeam',
+            populate: {
+                path: 'ownedByTeam',
+                select: 'teamName'
+            }
+        })
+        .populate('bookedByTeam', 'teamName teamLogo')
+        .sort({ createdAt: -1 }); // Most recent first
+
+        // Format the response
+        const formattedBookings = bookings.map(booking => {
+            const formattedDate = new Date(booking.bookedDate).toLocaleDateString('en-US', {
+                weekday: 'short',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+
+            return {
+                bookingId: booking._id,
+                groundName: booking.groundId?.groundName || 'Unknown Ground',
+                groundLocation: booking.groundId?.location || 'Unknown Location',
+                groundOwner: booking.groundId?.ownedByTeam?.teamName || 'Unknown Owner',
+                teamName: booking.bookedByTeam?.teamName || 'Unknown Team',
+                teamLogo: booking.bookedByTeam?.teamLogo || null,
+                bookedDate: formattedDate,
+                timeSlot: booking.timeSlot,
+                status: booking.status,
+                fee: booking.groundId?.fee || 0,
+                groundMaplink: booking.groundId?.groundMaplink || null,
+                createdAt: booking.createdAt,
+                // Status styling helper
+                statusColor: booking.status === 'booked' ? 'green' : 
+                           booking.status === 'rejected' ? 'red' : 'orange'
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'User bookings retrieved successfully',
+            bookings: formattedBookings,
+            totalBookings: formattedBookings.length
+        });
+
+    } catch (error) {
+        console.error('Error fetching user bookings:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
