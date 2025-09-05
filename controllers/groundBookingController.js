@@ -304,6 +304,46 @@ exports.updateBookingStatus = async (req, res) => {
 
             await transporter.sendMail(mailOptions);
 
+            // Send WhatsApp notification for booking status update
+            try {
+                const templateId = status === 'booked' ? 'booking_accepted' : 'booking_rejected';
+                const whatsappParams = status === 'booked' 
+                    ? [
+                        requestingTeam.createdBy.name,
+                        booking.groundId.groundName,
+                        formattedDate,
+                        booking.timeSlot,
+                        booking.groundId.fee,
+                        booking.groundId.location
+                    ]
+                    : [
+                        requestingTeam.createdBy.name,
+                        booking.groundId.groundName,
+                        formattedDate,
+                        booking.timeSlot
+                    ];
+
+                const gupshupResponse = await axios.post(
+                    'https://api.gupshup.io/wa/api/v1/template/msg',
+                    new URLSearchParams({
+                        apiKey: process.env.GUPSHUP_API_KEY,
+                        source: process.env.GUPSHUP_SOURCE_NUMBER,
+                        destination: `+91${requestingTeam.createdBy.mobile}`,
+                        templateId: templateId,
+                        params: JSON.stringify(whatsappParams)
+                    }).toString(),
+                    {
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        }
+                    }
+                );
+
+                console.log('WhatsApp booking status notification sent successfully:', gupshupResponse.data);
+            } catch (whatsappError) {
+                console.error('Failed to send WhatsApp booking status notification:', whatsappError.response?.data || whatsappError.message);
+            }
+
             res.status(200).json({
                 success: true,
                 message: `Booking ${status === 'booked' ? 'accepted' : 'rejected'} successfully and notifications sent.`,
