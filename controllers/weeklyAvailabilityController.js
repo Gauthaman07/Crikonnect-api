@@ -203,7 +203,7 @@ const updateDayTimeSlot = async (req, res) => {
             return res.status(400).json({ message: 'Invalid time slot specified.' });
         }
         
-        if (!['owner_play', 'guest_match', 'unavailable'].includes(mode)) {
+        if (!['owner_play', 'host_only', 'unavailable'].includes(mode)) {
             return res.status(400).json({ message: 'Invalid mode specified.' });
         }
         
@@ -235,8 +235,8 @@ const updateDayTimeSlot = async (req, res) => {
         
         // Check if there's an existing guest match request that needs to be handled
         const currentSlot = weeklyAvailability.schedule[day][timeSlot];
-        if (currentSlot.guestMatchRequest && mode !== 'guest_match') {
-            // If changing away from guest_match mode, cancel any pending request
+        if (currentSlot.guestMatchRequest && !['owner_play', 'host_only'].includes(mode)) {
+            // If changing away from interactive modes, cancel any pending request
             const guestRequest = await GuestMatchRequest.findById(currentSlot.guestMatchRequest);
             if (guestRequest && guestRequest.status === 'pending') {
                 guestRequest.status = 'cancelled';
@@ -247,7 +247,7 @@ const updateDayTimeSlot = async (req, res) => {
         // Update the specific day and time slot
         weeklyAvailability.schedule[day][timeSlot] = {
             mode: mode,
-            guestMatchRequest: mode === 'guest_match' ? currentSlot.guestMatchRequest : null
+            guestMatchRequest: ['owner_play', 'host_only'].includes(mode) ? currentSlot.guestMatchRequest : null
         };
         
         weeklyAvailability.updatedAt = Date.now();
@@ -304,10 +304,11 @@ const getAvailableGuestSlots = async (req, res) => {
         days.forEach(day => {
             ['morning', 'afternoon'].forEach(timeSlot => {
                 const slot = weeklyAvailability.schedule[day][timeSlot];
-                if (slot.mode === 'guest_match' && !slot.guestMatchRequest) {
+                if (['owner_play', 'host_only'].includes(slot.mode) && !slot.guestMatchRequest) {
                     availableSlots.push({
                         day,
                         timeSlot,
+                        mode: slot.mode,
                         date: new Date(monday.getTime() + (days.indexOf(day) * 24 * 60 * 60 * 1000))
                     });
                 }

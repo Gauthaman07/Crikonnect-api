@@ -11,11 +11,14 @@ const guestMatchRequestSchema = new Schema({
     
     // Teams involved
     teamA: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: true }, // Requesting team
-    teamB: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: true }, // Opponent team
+    teamB: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' }, // Opponent team (null for owner_play mode)
+    
+    // Match type based on availability mode
+    matchType: { type: String, enum: ['vs_owner', 'guest_vs_guest'], required: true },
     
     // Request details
     requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // User who made the request
-    matchType: { type: String, default: 'friendly' }, // friendly, tournament, league
+    matchCategory: { type: String, default: 'friendly' }, // friendly, tournament, league
     matchDescription: { type: String, maxlength: 500 },
     
     // Approval status
