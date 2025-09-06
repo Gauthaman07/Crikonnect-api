@@ -13,6 +13,8 @@ const groundRoutes = require('./routes/groundRoutes');
 const groundBookingRoutes = require('./routes/groundBookingRoutes');
 const tournamentRoutes = require('./routes/tournamentRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const weeklyAvailabilityRoutes = require('./routes/weeklyAvailabilityRoutes');
+const guestMatchRoutes = require('./routes/guestMatchRoutes');
 
 
 dotenv.config();
@@ -65,12 +67,19 @@ app.get('/', (req, res) => {
 });
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/fixtures', require('./routes/fixtureRoutes'));
+app.use('/api/weekly-availability', weeklyAvailabilityRoutes);
+app.use('/api/guest-matches', guestMatchRoutes);
 
 
 // MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/sportsBooking';
 mongoose.connect(MONGO_URI)
-    .then(() => console.log('Connected to MongoDB'))
+    .then(() => {
+        console.log('Connected to MongoDB');
+        // Start weekly schedule cron job after DB connection
+        const { startWeeklyScheduleCron } = require('./services/weeklyScheduleService');
+        startWeeklyScheduleCron();
+    })
     .catch(err => {
         console.error('Failed to connect to MongoDB:', err.message);
         process.exit(1); // Exit process if DB connection fails
