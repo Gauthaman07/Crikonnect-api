@@ -39,7 +39,7 @@ const createDefaultSchedule = () => {
 };
 
 // Auto-generate next week's availability (copying from previous week)
-exports.generateNextWeekAvailability = async (req, res) => {
+const generateNextWeekAvailability = async (req, res) => {
     try {
         const userId = req.user.id;
         
@@ -120,7 +120,7 @@ exports.generateNextWeekAvailability = async (req, res) => {
 };
 
 // Get weekly availability for ground owner
-exports.getWeeklyAvailability = async (req, res) => {
+const getWeeklyAvailability = async (req, res) => {
     try {
         const userId = req.user.id;
         const { weekStartDate } = req.query;
@@ -190,7 +190,7 @@ exports.getWeeklyAvailability = async (req, res) => {
 };
 
 // Update availability for specific day and time slot
-exports.updateDayTimeSlot = async (req, res) => {
+const updateDayTimeSlot = async (req, res) => {
     try {
         const userId = req.user.id;
         const { weekStartDate, day, timeSlot, mode } = req.body;
@@ -275,7 +275,7 @@ exports.updateDayTimeSlot = async (req, res) => {
 };
 
 // Get available slots for guest teams to request
-exports.getAvailableGuestSlots = async (req, res) => {
+const getAvailableGuestSlots = async (req, res) => {
     try {
         const { groundId, weekStartDate } = req.query;
         
@@ -333,8 +333,8 @@ exports.getAvailableGuestSlots = async (req, res) => {
 };
 
 module.exports = {
-    generateNextWeekAvailability: exports.generateNextWeekAvailability,
-    getWeeklyAvailability: exports.getWeeklyAvailability,
-    updateDayTimeSlot: exports.updateDayTimeSlot,
-    getAvailableGuestSlots: exports.getAvailableGuestSlots
+    generateNextWeekAvailability,
+    getWeeklyAvailability,
+    updateDayTimeSlot,
+    getAvailableGuestSlots
 };

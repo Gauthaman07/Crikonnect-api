@@ -6,7 +6,7 @@ const {
     updateDayTimeSlot,
     getAvailableGuestSlots
 } = require('../controllers/weeklyAvailabilityController');
-const { authenticateUser } = require('../middleware/authenticateUser');
+const authenticateUser = require('../middleware/authenticateUser');
 
 // Generate next week's availability (auto-copy from current week)
 router.post('/generate-next-week', authenticateUser, generateNextWeekAvailability);

@@ -5,7 +5,7 @@ const {
     respondToGuestMatch,
     getPendingGuestRequests
 } = require('../controllers/guestMatchController');
-const { authenticateUser } = require('../middleware/authenticateUser');
+const authenticateUser = require('../middleware/authenticateUser');
 
 // Request a guest match slot
 router.post('/request', authenticateUser, requestGuestMatch);

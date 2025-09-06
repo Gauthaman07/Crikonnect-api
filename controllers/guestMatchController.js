@@ -16,7 +16,7 @@ const getMondayOfWeek = (date) => {
 };
 
 // Request a guest match slot
-exports.requestGuestMatch = async (req, res) => {
+const requestGuestMatch = async (req, res) => {
     try {
         const userId = req.user.id;
         const { 
@@ -217,7 +217,7 @@ exports.requestGuestMatch = async (req, res) => {
 };
 
 // Approve or reject guest match request
-exports.respondToGuestMatch = async (req, res) => {
+const respondToGuestMatch = async (req, res) => {
     try {
         const userId = req.user.id;
         const { requestId } = req.params;
@@ -366,7 +366,7 @@ exports.respondToGuestMatch = async (req, res) => {
 };
 
 // Get pending guest match requests for ground owner
-exports.getPendingGuestRequests = async (req, res) => {
+const getPendingGuestRequests = async (req, res) => {
     try {
         const userId = req.user.id;
         
@@ -436,7 +436,7 @@ exports.getPendingGuestRequests = async (req, res) => {
 };
 
 module.exports = {
-    requestGuestMatch: exports.requestGuestMatch,
-    respondToGuestMatch: exports.respondToGuestMatch,
-    getPendingGuestRequests: exports.getPendingGuestRequests
+    requestGuestMatch,
+    respondToGuestMatch,
+    getPendingGuestRequests
 };
