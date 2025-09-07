@@ -57,18 +57,33 @@ exports.bookGround = async (req, res) => {
         let availabilityMode = 'regular'; // Default for slots without weekly availability
         let weeklyAvailabilityRef = null;
 
+        console.log('🔍 BOOKING DEBUG:');
+        console.log('   📅 Requested Date:', bookedDate);
+        console.log('   📅 Parsed Date Obj:', requestedDateObj);
+        console.log('   📅 Calculated Monday:', monday);
+        console.log('   🏟️ Ground ID:', groundId);
+
         const weeklyAvailability = await WeeklyAvailability.findOne({
             groundId: groundId,
             weekStartDate: monday
         }).populate('ownerTeamId');
 
+        console.log('   📋 Weekly Availability Found:', weeklyAvailability ? 'YES' : 'NO');
+        
         if (weeklyAvailability) {
             const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
             const dayName = dayNames[requestedDateObj.getDay()];
             const slot = weeklyAvailability.schedule[dayName][timeSlot];
             
+            console.log('   📅 Day Name:', dayName);
+            console.log('   ⏰ Time Slot:', timeSlot);
+            console.log('   🎯 Slot Data:', slot);
+            console.log('   🎯 Slot Mode:', slot?.mode);
+            
             availabilityMode = slot.mode;
             weeklyAvailabilityRef = weeklyAvailability._id;
+            
+            console.log('   ✅ Final Availability Mode:', availabilityMode);
             
             // Check availability mode rules
             if (slot.mode === 'unavailable') {
