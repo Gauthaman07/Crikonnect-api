@@ -639,3 +639,360 @@ exports.getUserBookings = async (req, res) => {
         });
     }
 };
+
+// Get pending ground booking requests with intelligent grouping
+const getPendingGroundRequests = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        // Find user's team that owns a ground
+        const ownerTeam = await Team.findOne({ 
+            createdBy: userId, 
+            hasOwnGround: true 
+        }).populate('groundId');
+        
+        if (!ownerTeam || !ownerTeam.groundId) {
+            return res.status(404).json({ 
+                message: 'No ground found for this user.' 
+            });
+        }
+        
+        console.log('🔍 PENDING REQUESTS DEBUG:');
+        console.log('   👤 User ID:', userId);
+        console.log('   🏟️ Owner Team:', ownerTeam.teamName);
+        console.log('   🏟️ Ground ID:', ownerTeam.groundId._id);
+        
+        // Get all pending requests for this ground
+        const pendingBookings = await GroundBooking.find({
+            groundId: ownerTeam.groundId._id,
+            status: 'pending'
+        })
+        .populate('bookedByTeam', 'teamName teamLogo')
+        .populate('opponentTeam', 'teamName teamLogo')
+        .sort({ bookedDate: 1, timeSlot: 1, createdAt: -1 });
+        
+        console.log('   📋 Total Pending Bookings:', pendingBookings.length);
+        
+        // Group bookings intelligently
+        const groupedRequests = [];
+        const processedBookings = new Set();
+        
+        for (const booking of pendingBookings) {
+            if (processedBookings.has(booking._id.toString())) {
+                continue;
+            }
+            
+            const bookingDateStr = booking.bookedDate.toISOString().split('T')[0];
+            const formattedDate = booking.bookedDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            console.log(`   🎯 Processing booking: ${booking.bookedByTeam.teamName} - ${booking.availabilityMode} - ${formattedDate} ${booking.timeSlot}`);
+            
+            if (booking.availabilityMode === 'owner_play') {
+                // Challenge match - single booking
+                groupedRequests.push({
+                    type: 'challenge_match',
+                    requestId: booking._id,
+                    requestIds: [booking._id],
+                    teamA: {
+                        id: booking.bookedByTeam._id,
+                        name: booking.bookedByTeam.teamName,
+                        logo: booking.bookedByTeam.teamLogo
+                    },
+                    teamB: {
+                        name: 'Your Team',
+                        logo: ownerTeam.teamLogo
+                    },
+                    groundName: ownerTeam.groundId.groundName,
+                    groundLocation: ownerTeam.groundId.location,
+                    date: formattedDate,
+                    timeSlot: booking.timeSlot,
+                    availabilityMode: booking.availabilityMode,
+                    createdAt: booking.createdAt,
+                    status: 'ready_for_approval'
+                });
+                
+                processedBookings.add(booking._id.toString());
+                console.log('   ✅ Added challenge match');
+                
+            } else if (booking.availabilityMode === 'host_only') {
+                // Find if there's another host_only booking for same slot
+                const matchingBooking = pendingBookings.find(otherBooking => 
+                    otherBooking._id.toString() !== booking._id.toString() &&
+                    !processedBookings.has(otherBooking._id.toString()) &&
+                    otherBooking.availabilityMode === 'host_only' &&
+                    otherBooking.bookedDate.toISOString().split('T')[0] === bookingDateStr &&
+                    otherBooking.timeSlot === booking.timeSlot
+                );
+                
+                if (matchingBooking) {
+                    // Pair found - create host match group
+                    groupedRequests.push({
+                        type: 'host_match_complete',
+                        groupId: `${booking._id}_${matchingBooking._id}`,
+                        requestIds: [booking._id, matchingBooking._id],
+                        teamA: {
+                            id: booking.bookedByTeam._id,
+                            name: booking.bookedByTeam.teamName,
+                            logo: booking.bookedByTeam.teamLogo
+                        },
+                        teamB: {
+                            id: matchingBooking.bookedByTeam._id,
+                            name: matchingBooking.bookedByTeam.teamName,
+                            logo: matchingBooking.bookedByTeam.teamLogo
+                        },
+                        groundName: ownerTeam.groundId.groundName,
+                        groundLocation: ownerTeam.groundId.location,
+                        date: formattedDate,
+                        timeSlot: booking.timeSlot,
+                        availabilityMode: booking.availabilityMode,
+                        createdAt: booking.createdAt,
+                        status: 'ready_for_approval'
+                    });
+                    
+                    processedBookings.add(booking._id.toString());
+                    processedBookings.add(matchingBooking._id.toString());
+                    console.log(`   ✅ Added complete host match: ${booking.bookedByTeam.teamName} vs ${matchingBooking.bookedByTeam.teamName}`);
+                    
+                } else {
+                    // Single host booking - waiting for opponent
+                    groupedRequests.push({
+                        type: 'host_match_waiting',
+                        requestId: booking._id,
+                        requestIds: [booking._id],
+                        teamA: {
+                            id: booking.bookedByTeam._id,
+                            name: booking.bookedByTeam.teamName,
+                            logo: booking.bookedByTeam.teamLogo
+                        },
+                        teamB: null,
+                        groundName: ownerTeam.groundId.groundName,
+                        groundLocation: ownerTeam.groundId.location,
+                        date: formattedDate,
+                        timeSlot: booking.timeSlot,
+                        availabilityMode: booking.availabilityMode,
+                        createdAt: booking.createdAt,
+                        status: 'waiting_for_opponent'
+                    });
+                    
+                    processedBookings.add(booking._id.toString());
+                    console.log('   ⏳ Added waiting host match');
+                }
+                
+            } else {
+                // Regular booking
+                groupedRequests.push({
+                    type: 'regular_booking',
+                    requestId: booking._id,
+                    requestIds: [booking._id],
+                    teamA: {
+                        id: booking.bookedByTeam._id,
+                        name: booking.bookedByTeam.teamName,
+                        logo: booking.bookedByTeam.teamLogo
+                    },
+                    teamB: null,
+                    groundName: ownerTeam.groundId.groundName,
+                    groundLocation: ownerTeam.groundId.location,
+                    date: formattedDate,
+                    timeSlot: booking.timeSlot,
+                    availabilityMode: booking.availabilityMode,
+                    createdAt: booking.createdAt,
+                    status: 'ready_for_approval'
+                });
+                
+                processedBookings.add(booking._id.toString());
+                console.log('   ✅ Added regular booking');
+            }
+        }
+        
+        // Sort by date and time
+        groupedRequests.sort((a, b) => {
+            const dateA = new Date(a.createdAt);
+            const dateB = new Date(b.createdAt);
+            return dateB - dateA; // Most recent first
+        });
+        
+        console.log('   📊 Final grouped requests:', groupedRequests.length);
+        
+        res.status(200).json({
+            success: true,
+            message: 'Pending ground requests retrieved successfully.',
+            requests: groupedRequests,
+            totalRequests: groupedRequests.length
+        });
+        
+    } catch (error) {
+        console.error('Error getting pending ground requests:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+
+// Respond to multiple ground booking requests (group approval/rejection)
+const respondToGroundBookings = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { requestIds, status, responseNote } = req.body;
+        
+        if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
+            return res.status(400).json({ 
+                message: 'Request IDs array is required.' 
+            });
+        }
+        
+        if (!['approved', 'rejected'].includes(status)) {
+            return res.status(400).json({ 
+                message: 'Status must be either "approved" or "rejected".' 
+            });
+        }
+        
+        console.log('🔍 GROUP BOOKING RESPONSE DEBUG:');
+        console.log('   👤 User ID:', userId);
+        console.log('   📋 Request IDs:', requestIds);
+        console.log('   ✅ Status:', status);
+        console.log('   💬 Note:', responseNote);
+        
+        // Find user's team that owns a ground
+        const ownerTeam = await Team.findOne({ 
+            createdBy: userId, 
+            hasOwnGround: true 
+        }).populate('groundId');
+        
+        if (!ownerTeam || !ownerTeam.groundId) {
+            return res.status(404).json({ 
+                message: 'No ground found for this user.' 
+            });
+        }
+        
+        // Find all the booking requests
+        const bookings = await GroundBooking.find({
+            _id: { $in: requestIds },
+            groundId: ownerTeam.groundId._id,
+            status: 'pending'
+        }).populate('bookedByTeam', 'teamName teamLogo createdBy')
+         .populate('opponentTeam', 'teamName teamLogo createdBy');
+        
+        if (bookings.length === 0) {
+            return res.status(404).json({ 
+                message: 'No pending bookings found for the given request IDs.' 
+            });
+        }
+        
+        if (bookings.length !== requestIds.length) {
+            return res.status(400).json({ 
+                message: 'Some booking requests were not found or are not in pending status.' 
+            });
+        }
+        
+        console.log('   📊 Found bookings:', bookings.length);
+        
+        // Update all booking statuses
+        const updateResults = [];
+        const notificationPromises = [];
+        
+        for (const booking of bookings) {
+            booking.status = status;
+            booking.responseDate = new Date();
+            booking.responseNote = responseNote || '';
+            booking.respondedBy = userId;
+            
+            await booking.save();
+            updateResults.push({
+                bookingId: booking._id,
+                teamName: booking.bookedByTeam.teamName,
+                date: booking.bookedDate,
+                timeSlot: booking.timeSlot,
+                status: status
+            });
+            
+            // Prepare notification for team owner
+            const teamOwner = await User.findById(booking.bookedByTeam.createdBy);
+            if (teamOwner) {
+                const formattedDate = booking.bookedDate.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                
+                let notificationTitle, notificationBody;
+                if (booking.availabilityMode === 'owner_play') {
+                    notificationTitle = `Challenge ${status === 'approved' ? 'Accepted' : 'Declined'}`;
+                    notificationBody = status === 'approved' 
+                        ? `Your challenge has been accepted! Match at ${ownerTeam.groundId.groundName} on ${formattedDate} ${booking.timeSlot}.`
+                        : `Your challenge request has been declined.`;
+                } else if (booking.availabilityMode === 'host_only') {
+                    notificationTitle = `Host Match ${status === 'approved' ? 'Approved' : 'Rejected'}`;
+                    notificationBody = status === 'approved'
+                        ? `Your match has been approved! Playing at ${ownerTeam.groundId.groundName} on ${formattedDate} ${booking.timeSlot}.`
+                        : `Your match request has been rejected.`;
+                } else {
+                    notificationTitle = `Booking ${status === 'approved' ? 'Confirmed' : 'Rejected'}`;
+                    notificationBody = status === 'approved'
+                        ? `Your ground booking has been confirmed for ${formattedDate} ${booking.timeSlot}.`
+                        : `Your ground booking request has been rejected.`;
+                }
+                
+                const notificationData = {
+                    bookingId: booking._id.toString(),
+                    groundId: ownerTeam.groundId._id.toString(),
+                    groundName: ownerTeam.groundId.groundName,
+                    date: formattedDate,
+                    timeSlot: booking.timeSlot,
+                    status: status,
+                    availabilityMode: booking.availabilityMode,
+                    type: 'booking_response'
+                };
+                
+                // Add to notification promises
+                notificationPromises.push(
+                    sendPushNotification(
+                        teamOwner._id,
+                        { title: notificationTitle, body: notificationBody },
+                        notificationData
+                    ).catch(error => {
+                        console.error(`Failed to send notification to ${teamOwner.name}:`, error);
+                    })
+                );
+            }
+        }
+        
+        // Send all notifications in parallel
+        try {
+            await Promise.allSettled(notificationPromises);
+            console.log('   📤 Notifications sent to all teams');
+        } catch (error) {
+            console.error('   ❌ Error sending some notifications:', error);
+        }
+        
+        res.status(200).json({
+            success: true,
+            message: `${bookings.length} booking request(s) ${status} successfully.`,
+            results: updateResults,
+            status: status,
+            totalProcessed: bookings.length
+        });
+        
+    } catch (error) {
+        console.error('Error responding to ground bookings:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+
+module.exports = {
+    bookGround: exports.bookGround,
+    getUserBookings,
+    getPendingGroundRequests,
+    respondToGroundBookings
+};
