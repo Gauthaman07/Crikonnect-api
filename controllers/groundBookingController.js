@@ -9,9 +9,10 @@ const { sendPushNotification } = require('../services/notificationService');
 
 // Helper function to get Monday of the week
 const getMondayOfWeek = (date) => {
-    const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(date.setDate(diff));
+    const inputDate = new Date(date); // Create a copy to avoid mutating original
+    const day = inputDate.getDay();
+    const diff = inputDate.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(inputDate.setDate(diff));
     monday.setHours(0, 0, 0, 0);
     return monday;
 };
@@ -52,8 +53,9 @@ exports.bookGround = async (req, res) => {
         }
 
         // Check weekly availability if it exists
-        const requestedDateObj = new Date(bookedDate);
-        const monday = getMondayOfWeek(requestedDateObj);
+        // Fix date parsing to ensure correct date interpretation
+        const requestedDateObj = new Date(bookedDate + 'T00:00:00.000Z');
+        const monday = getMondayOfWeek(new Date(requestedDateObj));
         let availabilityMode = 'regular'; // Default for slots without weekly availability
         let weeklyAvailabilityRef = null;
 
