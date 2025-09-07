@@ -119,18 +119,57 @@ exports.bookGround = async (req, res) => {
             }
         }
 
-        // Check if the time slot is already booked
-        const existingBooking = await GroundBooking.findOne({
-            groundId,
-            bookedDate,
-            timeSlot,
-            status: { $in: ['pending', 'booked'] }
-        });
-
-        if (existingBooking) {
-            return res.status(400).json({
-                message: 'This time slot is already booked or pending.'
+        // Check if the time slot is already booked (different logic for host_only mode)
+        if (availabilityMode === 'host_only') {
+            // For host_only mode, check if there are already 2 bookings (since 2 teams should play)
+            const existingBookings = await GroundBooking.find({
+                groundId,
+                bookedDate,
+                timeSlot,
+                status: { $in: ['pending', 'booked'] },
+                availabilityMode: 'host_only'
             });
+
+            if (existingBookings.length >= 2) {
+                return res.status(400).json({
+                    message: 'This time slot already has 2 teams booked for host-only match.'
+                });
+            }
+
+            // Check if this team has already booked this slot
+            const teamAlreadyBooked = existingBookings.find(booking => 
+                booking.bookedByTeam.toString() === bookedByTeam.toString()
+            );
+            if (teamAlreadyBooked) {
+                return res.status(400).json({
+                    message: 'Your team has already booked this time slot.'
+                });
+            }
+
+            // Check if opponent team has already booked this slot with a different opponent
+            const opponentAlreadyBooked = existingBookings.find(booking => 
+                booking.opponentTeam && booking.opponentTeam.toString() === opponentTeam.toString()
+            );
+            if (opponentAlreadyBooked) {
+                return res.status(400).json({
+                    message: 'The opponent team is already booked in this slot with another team.'
+                });
+            }
+
+        } else {
+            // For regular and owner_play modes, only one booking allowed per slot
+            const existingBooking = await GroundBooking.findOne({
+                groundId,
+                bookedDate,
+                timeSlot,
+                status: { $in: ['pending', 'booked'] }
+            });
+
+            if (existingBooking) {
+                return res.status(400).json({
+                    message: 'This time slot is already booked or pending.'
+                });
+            }
         }
 
         // Create new booking
