@@ -992,7 +992,8 @@ const respondToGroundBookings = async (req, res) => {
 
 module.exports = {
     bookGround: exports.bookGround,
-    getUserBookings,
+    updateBookingStatus: exports.updateBookingStatus,
+    getUserBookings: exports.getUserBookings,
     getPendingGroundRequests,
     respondToGroundBookings
 };
