@@ -108,27 +108,30 @@ exports.bookGround = async (req, res) => {
             } else if (slot.mode === 'host_only') {
                 // Guest team vs guest team mode
                 availabilityMode = 'host_only';
-                if (!opponentTeam || opponentTeam === 'null') {
-                    return res.status(400).json({
-                        message: 'For host_only mode, you must specify an opponent team.'
-                    });
+                // Allow booking without opponent team - they'll be matched when ground owner approves
+                if (opponentTeam && opponentTeam !== 'null') {
+                    // Verify opponent team exists if specified
+                    const opponent = await Team.findById(opponentTeam);
+                    if (!opponent) {
+                        return res.status(404).json({
+                            message: 'Opponent team not found.'
+                        });
+                    }
+                    // Verify teams are different
+                    if (bookedByTeam === opponentTeam) {
+                        return res.status(400).json({
+                            message: 'Booking team and opponent team must be different.'
+                        });
+                    }
+                    // Verify opponent team is not the owner team
+                    if (opponentTeam === weeklyAvailability.ownerTeamId._id.toString()) {
+                        return res.status(400).json({
+                            message: 'Owner team cannot participate in host_only matches.'
+                        });
+                    }
                 }
-                // Verify opponent team exists
-                const opponent = await Team.findById(opponentTeam);
-                if (!opponent) {
-                    return res.status(404).json({
-                        message: 'Opponent team not found.'
-                    });
-                }
-                // Verify teams are different
-                if (bookedByTeam === opponentTeam) {
-                    return res.status(400).json({
-                        message: 'Booking team and opponent team must be different.'
-                    });
-                }
-                // Verify neither team is the owner team
-                if (bookedByTeam === weeklyAvailability.ownerTeamId._id.toString() || 
-                    opponentTeam === weeklyAvailability.ownerTeamId._id.toString()) {
+                // Verify requesting team is not the owner team
+                if (bookedByTeam === weeklyAvailability.ownerTeamId._id.toString()) {
                     return res.status(400).json({
                         message: 'Owner team cannot participate in host_only matches.'
                     });
