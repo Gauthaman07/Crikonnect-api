@@ -1,4 +1,5 @@
 const GroundBooking = require('../models/groundBooking');
+const WeeklyAvailability = require('../models/weeklyAvailability');
 const Ground = require('../models/ground');
 const Team = require('../models/team');
 const User = require('../models/User');
@@ -6,13 +7,22 @@ const transporter = require('../config/emailConfig');
 const axios = require('axios');
 const { sendPushNotification } = require('../services/notificationService');
 
+// Helper function to get Monday of the week
+const getMondayOfWeek = (date) => {
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(date.setDate(diff));
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+};
+
 exports.bookGround = async (req, res) => {
     try {
         if (!req.user || !req.user.id) {
             return res.status(401).json({ message: 'Authentication required' });
         }
 
-        const { groundId, bookedDate, timeSlot, bookedByTeam } = req.body;
+        const { groundId, bookedDate, timeSlot, bookedByTeam, opponentTeam } = req.body;
         const userId = req.user.id;
 
         // Validation checks for required fields
@@ -41,6 +51,74 @@ exports.bookGround = async (req, res) => {
             });
         }
 
+        // Check weekly availability if it exists
+        const requestedDateObj = new Date(bookedDate);
+        const monday = getMondayOfWeek(requestedDateObj);
+        let availabilityMode = 'regular'; // Default for slots without weekly availability
+        let weeklyAvailabilityRef = null;
+
+        const weeklyAvailability = await WeeklyAvailability.findOne({
+            groundId: groundId,
+            weekStartDate: monday
+        }).populate('ownerTeamId');
+
+        if (weeklyAvailability) {
+            const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+            const dayName = dayNames[requestedDateObj.getDay()];
+            const slot = weeklyAvailability.schedule[dayName][timeSlot];
+            
+            availabilityMode = slot.mode;
+            weeklyAvailabilityRef = weeklyAvailability._id;
+            
+            // Check availability mode rules
+            if (slot.mode === 'unavailable') {
+                // Regular booking mode - existing logic applies
+                availabilityMode = 'regular';
+            } else if (slot.mode === 'owner_play') {
+                // Owner team vs guest team mode
+                availabilityMode = 'owner_play';
+                if (opponentTeam && opponentTeam !== 'null') {
+                    return res.status(400).json({
+                        message: 'For owner_play mode, you will play against the ground owner team. No opponent team needed.'
+                    });
+                }
+                // Verify the requesting team is not the owner team
+                if (bookedByTeam === weeklyAvailability.ownerTeamId._id.toString()) {
+                    return res.status(400).json({
+                        message: 'Owner team cannot book their own ground in owner_play mode.'
+                    });
+                }
+            } else if (slot.mode === 'host_only') {
+                // Guest team vs guest team mode
+                availabilityMode = 'host_only';
+                if (!opponentTeam || opponentTeam === 'null') {
+                    return res.status(400).json({
+                        message: 'For host_only mode, you must specify an opponent team.'
+                    });
+                }
+                // Verify opponent team exists
+                const opponent = await Team.findById(opponentTeam);
+                if (!opponent) {
+                    return res.status(404).json({
+                        message: 'Opponent team not found.'
+                    });
+                }
+                // Verify teams are different
+                if (bookedByTeam === opponentTeam) {
+                    return res.status(400).json({
+                        message: 'Booking team and opponent team must be different.'
+                    });
+                }
+                // Verify neither team is the owner team
+                if (bookedByTeam === weeklyAvailability.ownerTeamId._id.toString() || 
+                    opponentTeam === weeklyAvailability.ownerTeamId._id.toString()) {
+                    return res.status(400).json({
+                        message: 'Owner team cannot participate in host_only matches.'
+                    });
+                }
+            }
+        }
+
         // Check if the time slot is already booked
         const existingBooking = await GroundBooking.findOne({
             groundId,
@@ -61,7 +139,10 @@ exports.bookGround = async (req, res) => {
             bookedByTeam,
             bookedDate,
             timeSlot,
-            status: 'pending'
+            status: 'pending',
+            opponentTeam: opponentTeam && opponentTeam !== 'null' ? opponentTeam : null,
+            availabilityMode,
+            weeklyAvailabilityRef
         });
 
         const savedBooking = await newBooking.save();
@@ -77,21 +158,36 @@ exports.bookGround = async (req, res) => {
             day: 'numeric'
         });
 
-        // Send push notification to ground owner
+        // Prepare notification content based on booking type
+        let notificationTitle, notificationBody, matchDescription;
+        
+        if (availabilityMode === 'owner_play') {
+            notificationTitle = 'Challenge Request';
+            notificationBody = `${team.teamName} wants to challenge your team at ${ground.groundName} on ${formattedDate} ${timeSlot}`;
+            matchDescription = `Match: ${team.teamName} vs Your Team`;
+        } else if (availabilityMode === 'host_only') {
+            const opponent = await Team.findById(opponentTeam);
+            notificationTitle = 'Match Hosting Request';
+            notificationBody = `${team.teamName} vs ${opponent?.teamName || 'Unknown Team'} wants to play at ${ground.groundName} on ${formattedDate} ${timeSlot}`;
+            matchDescription = `Match: ${team.teamName} vs ${opponent?.teamName || 'Unknown Team'}`;
+        } else {
+            notificationTitle = 'Ground Booking Request';
+            notificationBody = `${team.teamName} has requested to book ${ground.groundName} on ${formattedDate} for ${timeSlot}`;
+            matchDescription = `Booking: ${team.teamName}`;
+        }
+
         // Send push notification to ground owner
         console.log('🏏 Ground Booking - Preparing push notification');
         console.log('   📋 Notification Details:');
         console.log('      Ground Owner ID:', ground.createdBy);
         console.log('      Ground Owner Name:', groundOwner?.name || groundOwner?.email);
-        console.log('      Team Name:', team.teamName);
+        console.log('      Match Type:', availabilityMode);
+        console.log('      Description:', matchDescription);
         console.log('      Ground Name:', ground.groundName);
         console.log('      Date:', formattedDate);
         console.log('      Time Slot:', timeSlot);
 
         try {
-            const notificationTitle = 'New Ground Booking Request';
-            const notificationBody = `${team.teamName} has requested to book ${ground.groundName} on ${formattedDate} for ${timeSlot}`;
-
             // Additional data to send with notification
             const notificationData = {
                 bookingId: savedBooking._id.toString(),
@@ -101,6 +197,8 @@ exports.bookGround = async (req, res) => {
                 groundName: ground.groundName,
                 date: formattedDate,
                 timeSlot: timeSlot,
+                availabilityMode: availabilityMode,
+                opponentTeam: opponentTeam,
                 type: 'new_booking_request'
             };
 
@@ -130,17 +228,24 @@ exports.bookGround = async (req, res) => {
         const mailOptions = {
             from: process.env.EMAIL_USER,
             to: groundOwner.email,
-            subject: 'New Ground Booking Request',
+            subject: notificationTitle,
             html: `
-                <h2>New Booking Request</h2>
-                <p>You have received a new booking request for your ground.</p>
-                <h3>Booking Details:</h3>
+                <h2>${notificationTitle}</h2>
+                <p>You have received a new request for your ground.</p>
+                <h3>Request Details:</h3>
                 <ul>
-                    <li><strong>Team:</strong> ${team.teamName}</li>
+                    <li><strong>Match Type:</strong> ${matchDescription}</li>
                     <li><strong>Date:</strong> ${formattedDate}</li>
                     <li><strong>Time Slot:</strong> ${timeSlot}</li>
                     <li><strong>Ground:</strong> ${ground.groundName}</li>
+                    <li><strong>Booking Mode:</strong> ${availabilityMode.replace('_', ' ').toUpperCase()}</li>
                 </ul>
+                ${availabilityMode === 'owner_play' ? 
+                    '<p><strong>Note:</strong> This is a challenge match against your team!</p>' : 
+                    availabilityMode === 'host_only' ? 
+                    '<p><strong>Note:</strong> You will host this match between two guest teams.</p>' :
+                    '<p><strong>Note:</strong> This is a regular ground booking.</p>'
+                }
                 <p>Please log in to your account to approve or reject this request.</p>
             `
         };
@@ -407,6 +512,7 @@ exports.getUserBookings = async (req, res) => {
             }
         })
         .populate('bookedByTeam', 'teamName teamLogo')
+        .populate('opponentTeam', 'teamName teamLogo') // Populate opponent team info
         .sort({ createdAt: -1 }); // Most recent first
 
         // Format the response
@@ -418,6 +524,18 @@ exports.getUserBookings = async (req, res) => {
                 day: 'numeric'
             });
 
+            // Determine match description based on booking type
+            let matchDescription = '';
+            let matchType = booking.availabilityMode || 'regular';
+            
+            if (matchType === 'owner_play') {
+                matchDescription = `${booking.bookedByTeam?.teamName} vs ${booking.groundId?.ownedByTeam?.teamName || 'Ground Owner'}`;
+            } else if (matchType === 'host_only' && booking.opponentTeam) {
+                matchDescription = `${booking.bookedByTeam?.teamName} vs ${booking.opponentTeam?.teamName}`;
+            } else {
+                matchDescription = `${booking.bookedByTeam?.teamName} (Regular Booking)`;
+            }
+
             return {
                 bookingId: booking._id,
                 groundName: booking.groundId?.groundName || 'Unknown Ground',
@@ -425,12 +543,21 @@ exports.getUserBookings = async (req, res) => {
                 groundOwner: booking.groundId?.ownedByTeam?.teamName || 'Unknown Owner',
                 teamName: booking.bookedByTeam?.teamName || 'Unknown Team',
                 teamLogo: booking.bookedByTeam?.teamLogo || null,
+                opponentTeam: booking.opponentTeam ? {
+                    name: booking.opponentTeam.teamName,
+                    logo: booking.opponentTeam.teamLogo
+                } : null,
                 bookedDate: formattedDate,
                 timeSlot: booking.timeSlot,
                 status: booking.status,
                 fee: booking.groundId?.fee || 0,
                 groundMaplink: booking.groundId?.groundMaplink || null,
                 createdAt: booking.createdAt,
+                // Enhanced fields
+                matchType: matchType,
+                matchDescription: matchDescription,
+                isChallenge: matchType === 'owner_play',
+                isHosting: matchType === 'host_only',
                 // Status styling helper
                 statusColor: booking.status === 'booked' ? 'green' : 
                            booking.status === 'rejected' ? 'red' : 'orange'
