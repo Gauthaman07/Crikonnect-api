@@ -854,6 +854,9 @@ const respondToGroundBookings = async (req, res) => {
             });
         }
         
+        // Convert "approved" to "booked" for database storage
+        const dbStatus = status === 'approved' ? 'booked' : 'rejected';
+        
         console.log('🔍 GROUP BOOKING RESPONSE DEBUG:');
         console.log('   👤 User ID:', userId);
         console.log('   📋 Request IDs:', requestIds);
@@ -899,7 +902,7 @@ const respondToGroundBookings = async (req, res) => {
         const notificationPromises = [];
         
         for (const booking of bookings) {
-            booking.status = status;
+            booking.status = dbStatus;
             booking.responseDate = new Date();
             booking.responseNote = responseNote || '';
             booking.respondedBy = userId;
@@ -910,7 +913,7 @@ const respondToGroundBookings = async (req, res) => {
                 teamName: booking.bookedByTeam.teamName,
                 date: booking.bookedDate,
                 timeSlot: booking.timeSlot,
-                status: status
+                status: dbStatus
             });
             
             // Prepare notification for team owner
@@ -977,7 +980,7 @@ const respondToGroundBookings = async (req, res) => {
             success: true,
             message: `${bookings.length} booking request(s) ${status} successfully.`,
             results: updateResults,
-            status: status,
+            status: dbStatus,
             totalProcessed: bookings.length
         });
         
