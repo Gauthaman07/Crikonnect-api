@@ -848,14 +848,14 @@ const respondToGroundBookings = async (req, res) => {
             });
         }
         
-        if (!['approved', 'rejected'].includes(status)) {
+        if (!['approved', 'rejected', 'booked'].includes(status)) {
             return res.status(400).json({ 
-                message: 'Status must be either "approved" or "rejected".' 
+                message: 'Status must be either "approved", "booked", or "rejected".' 
             });
         }
         
-        // Convert "approved" to "booked" for database storage
-        const dbStatus = status === 'approved' ? 'booked' : 'rejected';
+        // Convert "approved" and "booked" to "booked" for database storage
+        const dbStatus = (status === 'approved' || status === 'booked') ? 'booked' : 'rejected';
         
         console.log('🔍 GROUP BOOKING RESPONSE DEBUG:');
         console.log('   👤 User ID:', userId);
