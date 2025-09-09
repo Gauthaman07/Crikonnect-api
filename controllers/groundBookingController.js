@@ -672,9 +672,20 @@ const getPendingGroundRequests = async (req, res) => {
         .populate('opponentTeam', 'teamName teamLogo')
         .sort({ bookedDate: 1, timeSlot: 1, createdAt: -1 });
         
-        console.log('   📋 Total Pending Bookings:', pendingBookings.length);
+        // Get all confirmed bookings for this ground
+        const confirmedBookings = await GroundBooking.find({
+            groundId: ownerTeam.groundId._id,
+            status: 'booked',
+            bookedDate: { $gte: new Date() } // Only future bookings
+        })
+        .populate('bookedByTeam', 'teamName teamLogo')
+        .populate('opponentTeam', 'teamName teamLogo')
+        .sort({ bookedDate: 1, timeSlot: 1 });
         
-        // Group bookings intelligently
+        console.log('   📋 Total Pending Bookings:', pendingBookings.length);
+        console.log('   ✅ Total Confirmed Bookings:', confirmedBookings.length);
+        
+        // Group pending bookings intelligently
         const groupedRequests = [];
         const processedBookings = new Set();
         
@@ -819,11 +830,95 @@ const getPendingGroundRequests = async (req, res) => {
         
         console.log('   📊 Final grouped requests:', groupedRequests.length);
         
+        // Process confirmed bookings
+        const confirmedMatches = [];
+        for (const booking of confirmedBookings) {
+            const formattedDate = booking.bookedDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            if (booking.availabilityMode === 'owner_play') {
+                // Challenge match - your team vs guest team
+                confirmedMatches.push({
+                    type: 'challenge_match',
+                    matchId: booking._id,
+                    teamA: {
+                        name: 'Your Team',
+                        logo: ownerTeam.teamLogo
+                    },
+                    teamB: {
+                        id: booking.bookedByTeam._id,
+                        name: booking.bookedByTeam.teamName,
+                        logo: booking.bookedByTeam.teamLogo
+                    },
+                    groundName: ownerTeam.groundId.groundName,
+                    groundLocation: ownerTeam.groundId.location,
+                    date: formattedDate,
+                    timeSlot: booking.timeSlot,
+                    availabilityMode: booking.availabilityMode,
+                    status: 'confirmed',
+                    bookedDate: booking.bookedDate
+                });
+            } else if (booking.availabilityMode === 'host_only' && booking.opponentTeam) {
+                // Host match - guest team A vs guest team B
+                confirmedMatches.push({
+                    type: 'host_match',
+                    matchId: booking._id,
+                    teamA: {
+                        id: booking.bookedByTeam._id,
+                        name: booking.bookedByTeam.teamName,
+                        logo: booking.bookedByTeam.teamLogo
+                    },
+                    teamB: {
+                        id: booking.opponentTeam._id,
+                        name: booking.opponentTeam.teamName,
+                        logo: booking.opponentTeam.teamLogo
+                    },
+                    groundName: ownerTeam.groundId.groundName,
+                    groundLocation: ownerTeam.groundId.location,
+                    date: formattedDate,
+                    timeSlot: booking.timeSlot,
+                    availabilityMode: booking.availabilityMode,
+                    status: 'confirmed',
+                    bookedDate: booking.bookedDate
+                });
+            } else {
+                // Regular booking
+                confirmedMatches.push({
+                    type: 'regular_booking',
+                    matchId: booking._id,
+                    teamA: {
+                        id: booking.bookedByTeam._id,
+                        name: booking.bookedByTeam.teamName,
+                        logo: booking.bookedByTeam.teamLogo
+                    },
+                    teamB: null,
+                    groundName: ownerTeam.groundId.groundName,
+                    groundLocation: ownerTeam.groundId.location,
+                    date: formattedDate,
+                    timeSlot: booking.timeSlot,
+                    availabilityMode: booking.availabilityMode,
+                    status: 'confirmed',
+                    bookedDate: booking.bookedDate
+                });
+            }
+        }
+        
+        // Sort confirmed matches by date
+        confirmedMatches.sort((a, b) => new Date(a.bookedDate) - new Date(b.bookedDate));
+        
+        console.log('   🎯 Final confirmed matches:', confirmedMatches.length);
+        
         res.status(200).json({
             success: true,
-            message: 'Pending ground requests retrieved successfully.',
-            requests: groupedRequests,
-            totalRequests: groupedRequests.length
+            message: 'Ground requests and matches retrieved successfully.',
+            pendingRequests: groupedRequests,
+            confirmedMatches: confirmedMatches,
+            totalPendingRequests: groupedRequests.length,
+            totalConfirmedMatches: confirmedMatches.length
         });
         
     } catch (error) {
