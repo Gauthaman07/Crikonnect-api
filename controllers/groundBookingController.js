@@ -832,10 +832,10 @@ const getPendingGroundRequests = async (req, res) => {
         
         // Process confirmed bookings with intelligent grouping
         const confirmedMatches = [];
-        const processedBookings = new Set();
+        const processedConfirmedBookings = new Set();
         
         for (const booking of confirmedBookings) {
-            if (processedBookings.has(booking._id.toString())) {
+            if (processedConfirmedBookings.has(booking._id.toString())) {
                 continue;
             }
             
@@ -868,14 +868,14 @@ const getPendingGroundRequests = async (req, res) => {
                     status: 'confirmed',
                     bookedDate: booking.bookedDate
                 });
-                processedBookings.add(booking._id.toString());
+                processedConfirmedBookings.add(booking._id.toString());
                 
             } else if (booking.availabilityMode === 'host_only') {
                 // Find matching host_only booking for same date/time slot
                 const bookingDateStr = booking.bookedDate.toISOString().split('T')[0];
                 const matchingBooking = confirmedBookings.find(otherBooking => 
                     otherBooking._id.toString() !== booking._id.toString() &&
-                    !processedBookings.has(otherBooking._id.toString()) &&
+                    !processedConfirmedBookings.has(otherBooking._id.toString()) &&
                     otherBooking.availabilityMode === 'host_only' &&
                     otherBooking.bookedDate.toISOString().split('T')[0] === bookingDateStr &&
                     otherBooking.timeSlot === booking.timeSlot
@@ -904,8 +904,8 @@ const getPendingGroundRequests = async (req, res) => {
                         status: 'confirmed',
                         bookedDate: booking.bookedDate
                     });
-                    processedBookings.add(booking._id.toString());
-                    processedBookings.add(matchingBooking._id.toString());
+                    processedConfirmedBookings.add(booking._id.toString());
+                    processedConfirmedBookings.add(matchingBooking._id.toString());
                 } else {
                     // Single host booking - no pair yet (shouldn't happen in normal flow)
                     confirmedMatches.push({
@@ -925,7 +925,7 @@ const getPendingGroundRequests = async (req, res) => {
                         status: 'confirmed',
                         bookedDate: booking.bookedDate
                     });
-                    processedBookings.add(booking._id.toString());
+                    processedConfirmedBookings.add(booking._id.toString());
                 }
                 
             } else {
@@ -947,7 +947,7 @@ const getPendingGroundRequests = async (req, res) => {
                     status: 'confirmed',
                     bookedDate: booking.bookedDate
                 });
-                processedBookings.add(booking._id.toString());
+                processedConfirmedBookings.add(booking._id.toString());
             }
         }
         
