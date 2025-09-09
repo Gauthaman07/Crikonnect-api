@@ -830,9 +830,15 @@ const getPendingGroundRequests = async (req, res) => {
         
         console.log('   📊 Final grouped requests:', groupedRequests.length);
         
-        // Process confirmed bookings
+        // Process confirmed bookings with intelligent grouping
         const confirmedMatches = [];
+        const processedBookings = new Set();
+        
         for (const booking of confirmedBookings) {
+            if (processedBookings.has(booking._id.toString())) {
+                continue;
+            }
+            
             const formattedDate = booking.bookedDate.toLocaleDateString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
@@ -862,29 +868,66 @@ const getPendingGroundRequests = async (req, res) => {
                     status: 'confirmed',
                     bookedDate: booking.bookedDate
                 });
-            } else if (booking.availabilityMode === 'host_only' && booking.opponentTeam) {
-                // Host match - guest team A vs guest team B
-                confirmedMatches.push({
-                    type: 'host_match',
-                    matchId: booking._id,
-                    teamA: {
-                        id: booking.bookedByTeam._id,
-                        name: booking.bookedByTeam.teamName,
-                        logo: booking.bookedByTeam.teamLogo
-                    },
-                    teamB: {
-                        id: booking.opponentTeam._id,
-                        name: booking.opponentTeam.teamName,
-                        logo: booking.opponentTeam.teamLogo
-                    },
-                    groundName: ownerTeam.groundId.groundName,
-                    groundLocation: ownerTeam.groundId.location,
-                    date: formattedDate,
-                    timeSlot: booking.timeSlot,
-                    availabilityMode: booking.availabilityMode,
-                    status: 'confirmed',
-                    bookedDate: booking.bookedDate
-                });
+                processedBookings.add(booking._id.toString());
+                
+            } else if (booking.availabilityMode === 'host_only') {
+                // Find matching host_only booking for same date/time slot
+                const bookingDateStr = booking.bookedDate.toISOString().split('T')[0];
+                const matchingBooking = confirmedBookings.find(otherBooking => 
+                    otherBooking._id.toString() !== booking._id.toString() &&
+                    !processedBookings.has(otherBooking._id.toString()) &&
+                    otherBooking.availabilityMode === 'host_only' &&
+                    otherBooking.bookedDate.toISOString().split('T')[0] === bookingDateStr &&
+                    otherBooking.timeSlot === booking.timeSlot
+                );
+                
+                if (matchingBooking) {
+                    // Pair found - create combined host match
+                    confirmedMatches.push({
+                        type: 'host_match',
+                        matchId: `${booking._id}_${matchingBooking._id}`,
+                        teamA: {
+                            id: booking.bookedByTeam._id,
+                            name: booking.bookedByTeam.teamName,
+                            logo: booking.bookedByTeam.teamLogo
+                        },
+                        teamB: {
+                            id: matchingBooking.bookedByTeam._id,
+                            name: matchingBooking.bookedByTeam.teamName,
+                            logo: matchingBooking.bookedByTeam.teamLogo
+                        },
+                        groundName: ownerTeam.groundId.groundName,
+                        groundLocation: ownerTeam.groundId.location,
+                        date: formattedDate,
+                        timeSlot: booking.timeSlot,
+                        availabilityMode: booking.availabilityMode,
+                        status: 'confirmed',
+                        bookedDate: booking.bookedDate
+                    });
+                    processedBookings.add(booking._id.toString());
+                    processedBookings.add(matchingBooking._id.toString());
+                } else {
+                    // Single host booking - no pair yet (shouldn't happen in normal flow)
+                    confirmedMatches.push({
+                        type: 'host_match_single',
+                        matchId: booking._id,
+                        teamA: {
+                            id: booking.bookedByTeam._id,
+                            name: booking.bookedByTeam.teamName,
+                            logo: booking.bookedByTeam.teamLogo
+                        },
+                        teamB: null,
+                        groundName: ownerTeam.groundId.groundName,
+                        groundLocation: ownerTeam.groundId.location,
+                        date: formattedDate,
+                        timeSlot: booking.timeSlot,
+                        availabilityMode: booking.availabilityMode,
+                        status: 'confirmed',
+                        bookedDate: booking.bookedDate
+                    });
+                    processedBookings.add(booking._id.toString());
+                }
+                
             } else {
                 // Regular booking
                 confirmedMatches.push({
@@ -904,6 +947,7 @@ const getPendingGroundRequests = async (req, res) => {
                     status: 'confirmed',
                     bookedDate: booking.bookedDate
                 });
+                processedBookings.add(booking._id.toString());
             }
         }
         
