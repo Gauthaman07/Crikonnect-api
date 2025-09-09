@@ -223,11 +223,15 @@ const respondToGuestMatch = async (req, res) => {
         const { requestId } = req.params;
         const { status, responseNote } = req.body;
         
-        if (!['approved', 'rejected'].includes(status)) {
+        // Accept both frontend status values and convert to appropriate backend status
+        if (!['approved', 'rejected', 'booked'].includes(status)) {
             return res.status(400).json({ 
-                message: 'Status must be either "approved" or "rejected".' 
+                message: 'Status must be either "approved", "booked", or "rejected".' 
             });
         }
+        
+        // Convert "booked" to "approved" for database storage (frontend compatibility)
+        const dbStatus = status === 'booked' ? 'approved' : status;
         
         // Find the request
         const guestRequest = await GuestMatchRequest.findById(requestId)
@@ -254,14 +258,14 @@ const respondToGuestMatch = async (req, res) => {
         }
         
         // Update request status
-        guestRequest.status = status;
+        guestRequest.status = dbStatus;
         guestRequest.responseDate = new Date();
         guestRequest.responseNote = responseNote || '';
         guestRequest.respondedBy = userId;
         await guestRequest.save();
         
         // If rejected, clear the guest match request from weekly availability
-        if (status === 'rejected') {
+        if (dbStatus === 'rejected') {
             const weeklyAvailability = await WeeklyAvailability.findById(guestRequest.weeklyAvailabilityId);
             if (weeklyAvailability) {
                 const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -287,8 +291,8 @@ const respondToGuestMatch = async (req, res) => {
         
         // Send push notification to requesting team
         try {
-            const notificationTitle = `Guest Match Request ${status === 'approved' ? 'Approved' : 'Rejected'}`;
-            const notificationBody = `Your match request for ${guestRequest.groundId.groundName} on ${formattedDate} has been ${status}.`;
+            const notificationTitle = `Guest Match Request ${dbStatus === 'approved' ? 'Approved' : 'Rejected'}`;
+            const notificationBody = `Your match request for ${guestRequest.groundId.groundName} on ${formattedDate} has been ${dbStatus}.`;
             
             const notificationData = {
                 requestId: guestRequest._id.toString(),
@@ -296,7 +300,7 @@ const respondToGuestMatch = async (req, res) => {
                 groundName: guestRequest.groundId.groundName,
                 date: formattedDate,
                 timeSlot: guestRequest.timeSlot,
-                status: status,
+                status: dbStatus,
                 type: 'guest_match_response'
             };
             
@@ -316,10 +320,10 @@ const respondToGuestMatch = async (req, res) => {
             const mailOptions = {
                 from: process.env.EMAIL_USER,
                 to: requestingTeamOwner.email,
-                subject: `Guest Match Request ${status === 'approved' ? 'Approved' : 'Rejected'}`,
+                subject: `Guest Match Request ${dbStatus === 'approved' ? 'Approved' : 'Rejected'}`,
                 html: `
-                    <h2>Match Request ${status === 'approved' ? 'Approved' : 'Rejected'}</h2>
-                    <p>Your guest match request has been ${status}.</p>
+                    <h2>Match Request ${dbStatus === 'approved' ? 'Approved' : 'Rejected'}</h2>
+                    <p>Your guest match request has been ${dbStatus}.</p>
                     <h3>Match Details:</h3>
                     <ul>
                         <li><strong>Teams:</strong> ${guestRequest.teamA.teamName} vs ${guestRequest.teamB.teamName}</li>
@@ -349,7 +353,7 @@ const respondToGuestMatch = async (req, res) => {
             message: `Guest match request ${status} successfully.`,
             request: {
                 requestId: guestRequest._id,
-                status: status,
+                status: dbStatus,
                 responseDate: guestRequest.responseDate,
                 responseNote: guestRequest.responseNote
             }
