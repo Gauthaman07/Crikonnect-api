@@ -13,7 +13,7 @@ fcmToken: {
     default: null
   },
   // Password reset fields
-  resetPasswordToken: {
+  resetPasswordOTP: {
     type: String,
     default: null
   },

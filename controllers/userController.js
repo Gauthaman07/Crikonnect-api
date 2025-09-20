@@ -179,38 +179,46 @@ exports.forgotPassword = async (req, res) => {
             return res.status(404).json({ message: 'User not found with this email address' });
         }
 
-        // Generate reset token
-        const resetToken = crypto.randomBytes(32).toString('hex');
+        // Generate 6-digit OTP
+        const resetOTP = Math.floor(100000 + Math.random() * 900000).toString();
 
-        // Set token and expiration (1 hour from now)
-        user.resetPasswordToken = resetToken;
-        user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+        // Set OTP and expiration (10 minutes from now)
+        user.resetPasswordOTP = resetOTP;
+        user.resetPasswordExpires = Date.now() + 600000; // 10 minutes
 
         await user.save();
-
-        // Create reset URL (you can modify this to match your frontend URL)
-        const resetUrl = `https://crikonnect-api.onrender.com/api/auth/reset-password?token=${resetToken}`;
 
         // Email options
         const mailOptions = {
             from: process.env.EMAIL_USER,
             to: user.email,
-            subject: 'Crickonnect - Password Reset Request',
+            subject: 'Crickonnect - Password Reset Code',
             html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #d32f2f;">Crickonnect Password Reset</h2>
-                    <p>Hi ${user.name},</p>
-                    <p>You requested a password reset for your Crickonnect account.</p>
-                    <p>Click the button below to reset your password:</p>
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="${resetUrl}" style="background-color: #d32f2f; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a>
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <h1 style="color: #d32f2f; margin: 0;">Crickonnect</h1>
+                        <p style="color: #666; margin: 5px 0;">Password Reset Code</p>
                     </div>
-                    <p>Or copy and paste this link in your browser:</p>
-                    <p style="word-break: break-all; color: #666;">${resetUrl}</p>
-                    <p><strong>This link will expire in 1 hour.</strong></p>
-                    <p>If you didn't request this password reset, please ignore this email.</p>
+
+                    <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px; text-align: center; margin: 20px 0;">
+                        <h2 style="color: #333; margin-bottom: 15px;">Hi ${user.name}!</h2>
+                        <p style="color: #666; margin-bottom: 25px;">Enter this code in the Crickonnect app to reset your password:</p>
+
+                        <div style="background-color: white; border: 2px solid #d32f2f; border-radius: 8px; padding: 20px; margin: 20px 0; display: inline-block;">
+                            <h1 style="color: #d32f2f; margin: 0; font-size: 36px; letter-spacing: 8px; font-family: 'Courier New', monospace;">${resetOTP}</h1>
+                        </div>
+
+                        <p style="color: #d32f2f; font-weight: bold; margin-top: 20px;">⏰ This code expires in 10 minutes</p>
+                    </div>
+
+                    <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
+                        <p style="color: #856404; margin: 0; font-size: 14px;">
+                            <strong>Security Note:</strong> If you didn't request this password reset, please ignore this email. Your account remains secure.
+                        </p>
+                    </div>
+
                     <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                    <p style="color: #666; font-size: 12px;">
+                    <p style="color: #666; font-size: 12px; text-align: center;">
                         This is an automated email from Crickonnect. Please do not reply to this email.
                     </p>
                 </div>
@@ -221,7 +229,7 @@ exports.forgotPassword = async (req, res) => {
         await transporter.sendMail(mailOptions);
 
         res.status(200).json({
-            message: 'Password reset email sent successfully'
+            message: 'Password reset code sent to your email successfully'
         });
 
     } catch (error) {
@@ -229,21 +237,51 @@ exports.forgotPassword = async (req, res) => {
 
         // Reset the fields if email sending fails
         if (user) {
-            user.resetPasswordToken = undefined;
+            user.resetPasswordOTP = undefined;
             user.resetPasswordExpires = undefined;
             await user.save();
         }
 
-        res.status(500).json({ message: 'Error sending password reset email' });
+        res.status(500).json({ message: 'Error sending password reset code' });
+    }
+};
+
+// Verify OTP
+exports.verifyOTP = async (req, res) => {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+        return res.status(400).json({ message: 'Email and OTP are required' });
+    }
+
+    try {
+        const user = await User.findOne({
+            email: email,
+            resetPasswordOTP: otp,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
+
+        res.status(200).json({
+            message: 'OTP verified successfully',
+            verified: true
+        });
+
+    } catch (error) {
+        console.error('Error in OTP verification:', error);
+        res.status(500).json({ message: 'Error verifying OTP' });
     }
 };
 
 // Reset Password
 exports.resetPassword = async (req, res) => {
-    const { token, newPassword } = req.body;
+    const { email, otp, newPassword } = req.body;
 
-    if (!token || !newPassword) {
-        return res.status(400).json({ message: 'Token and new password are required' });
+    if (!email || !otp || !newPassword) {
+        return res.status(400).json({ message: 'Email, OTP, and new password are required' });
     }
 
     if (newPassword.length < 6) {
@@ -252,12 +290,13 @@ exports.resetPassword = async (req, res) => {
 
     try {
         const user = await User.findOne({
-            resetPasswordToken: token,
+            email: email,
+            resetPasswordOTP: otp,
             resetPasswordExpires: { $gt: Date.now() }
         });
 
         if (!user) {
-            return res.status(400).json({ message: 'Invalid or expired reset token' });
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
         }
 
         // Hash the new password
@@ -265,7 +304,7 @@ exports.resetPassword = async (req, res) => {
 
         // Update user password and clear reset fields
         user.password = hashedPassword;
-        user.resetPasswordToken = undefined;
+        user.resetPasswordOTP = undefined;
         user.resetPasswordExpires = undefined;
 
         await user.save();
