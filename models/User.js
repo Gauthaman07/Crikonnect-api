@@ -11,6 +11,15 @@ const userSchema = new mongoose.Schema({
 fcmToken: {
     type: String,
     default: null
+  },
+  // Password reset fields
+  resetPasswordToken: {
+    type: String,
+    default: null
+  },
+  resetPasswordExpires: {
+    type: Date,
+    default: null
   }
 });
 
