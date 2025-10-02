@@ -257,7 +257,7 @@ exports.bookGround = async (req, res) => {
                 date: formattedDate,
                 timeSlot: timeSlot,
                 availabilityMode: availabilityMode,
-                opponentTeam: opponentTeam,
+                opponentTeam: opponentTeam ? opponentTeam.toString() : '',
                 type: 'new_booking_request'
             };
 
@@ -284,32 +284,37 @@ exports.bookGround = async (req, res) => {
         }
 
         // Send email notification
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: groundOwner.email,
-            subject: notificationTitle,
-            html: `
-                <h2>${notificationTitle}</h2>
-                <p>You have received a new request for your ground.</p>
-                <h3>Request Details:</h3>
-                <ul>
-                    <li><strong>Match Type:</strong> ${matchDescription}</li>
-                    <li><strong>Date:</strong> ${formattedDate}</li>
-                    <li><strong>Time Slot:</strong> ${timeSlot}</li>
-                    <li><strong>Ground:</strong> ${ground.groundName}</li>
-                    <li><strong>Booking Mode:</strong> ${availabilityMode.replace('_', ' ').toUpperCase()}</li>
-                </ul>
-                ${availabilityMode === 'owner_play' ? 
-                    '<p><strong>Note:</strong> This is a challenge match against your team!</p>' : 
-                    availabilityMode === 'host_only' ? 
-                    '<p><strong>Note:</strong> You will host this match between two guest teams.</p>' :
-                    '<p><strong>Note:</strong> This is a regular ground booking.</p>'
-                }
-                <p>Please log in to your account to approve or reject this request.</p>
-            `
-        };
+        try {
+            const mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: groundOwner.email,
+                subject: notificationTitle,
+                html: `
+                    <h2>${notificationTitle}</h2>
+                    <p>You have received a new request for your ground.</p>
+                    <h3>Request Details:</h3>
+                    <ul>
+                        <li><strong>Match Type:</strong> ${matchDescription}</li>
+                        <li><strong>Date:</strong> ${formattedDate}</li>
+                        <li><strong>Time Slot:</strong> ${timeSlot}</li>
+                        <li><strong>Ground:</strong> ${ground.groundName}</li>
+                        <li><strong>Booking Mode:</strong> ${availabilityMode.replace('_', ' ').toUpperCase()}</li>
+                    </ul>
+                    ${availabilityMode === 'owner_play' ?
+                        '<p><strong>Note:</strong> This is a challenge match against your team!</p>' :
+                        availabilityMode === 'host_only' ?
+                        '<p><strong>Note:</strong> You will host this match between two guest teams.</p>' :
+                        '<p><strong>Note:</strong> This is a regular ground booking.</p>'
+                    }
+                    <p>Please log in to your account to approve or reject this request.</p>
+                `
+            };
 
-        await transporter.sendMail(mailOptions);
+            await transporter.sendMail(mailOptions);
+            console.log('✅ Email notification sent successfully');
+        } catch (emailError) {
+            console.error('⚠️ Email notification failed but continuing with booking:', emailError.message);
+        }
 
         console.log('GUPSHUP_API_KEY:', process.env.GUPSHUP_API_KEY);
         console.log('GUPSHUP_SOURCE_NUMBER:', process.env.GUPSHUP_SOURCE_NUMBER);
