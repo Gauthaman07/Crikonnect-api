@@ -71,27 +71,35 @@ exports.bookGround = async (req, res) => {
         }).populate('ownerTeamId');
 
         console.log('   📋 Weekly Availability Found:', weeklyAvailability ? 'YES' : 'NO');
-        
+
         if (weeklyAvailability) {
             const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
             const dayName = dayNames[requestedDateObj.getDay()];
-            const slot = weeklyAvailability.schedule[dayName][timeSlot];
-            
+            const slot = weeklyAvailability.schedule[dayName]?.[timeSlot];
+
             console.log('   📅 Day Name:', dayName);
             console.log('   ⏰ Time Slot:', timeSlot);
             console.log('   🎯 Slot Data:', slot);
             console.log('   🎯 Slot Mode:', slot?.mode);
-            
-            availabilityMode = slot.mode;
-            weeklyAvailabilityRef = weeklyAvailability._id;
-            
-            console.log('   ✅ Final Availability Mode:', availabilityMode);
-            
+
+            // Only update if slot exists and has a mode
+            if (slot && slot.mode) {
+                availabilityMode = slot.mode;
+                weeklyAvailabilityRef = weeklyAvailability._id;
+
+                console.log('   ✅ Availability Mode from Weekly Schedule:', availabilityMode);
+            } else {
+                console.log('   ⚠️ No slot configuration found, using default mode: regular');
+            }
+
             // Check availability mode rules
-            if (slot.mode === 'unavailable') {
-                // Regular booking mode - existing logic applies
-                availabilityMode = 'regular';
-            } else if (slot.mode === 'owner_play') {
+            if (slot && slot.mode === 'unavailable') {
+                // Slot is marked as unavailable - don't allow booking
+                return res.status(400).json({
+                    success: false,
+                    message: 'This time slot is not available for booking.'
+                });
+            } else if (availabilityMode === 'owner_play') {
                 // Owner team vs guest team mode
                 availabilityMode = 'owner_play';
                 if (opponentTeam && opponentTeam !== 'null') {
@@ -140,6 +148,9 @@ exports.bookGround = async (req, res) => {
         }
 
         // Check if the time slot is already booked (different logic for host_only mode)
+        console.log('🔍 CHECKING EXISTING BOOKINGS:');
+        console.log('   📊 Availability Mode:', availabilityMode);
+
         if (availabilityMode === 'host_only') {
             // For host_only mode, check if there are already 2 bookings (since 2 teams should play)
             const existingBookings = await GroundBooking.find({
@@ -150,31 +161,41 @@ exports.bookGround = async (req, res) => {
                 availabilityMode: 'host_only'
             });
 
+            console.log('   📋 Existing host_only bookings:', existingBookings.length);
+            existingBookings.forEach((b, i) => {
+                console.log(`      Booking ${i+1}: Team ${b.bookedByTeam}, Status: ${b.status}`);
+            });
+
             if (existingBookings.length >= 2) {
                 return res.status(400).json({
-                    message: 'This time slot already has 2 teams booked for host-only match.'
+                    success: false,
+                    message: 'This time slot already has 2 teams booked for host match. Please choose another slot.'
                 });
             }
 
             // Check if this team has already booked this slot
-            const teamAlreadyBooked = existingBookings.find(booking => 
+            const teamAlreadyBooked = existingBookings.find(booking =>
                 booking.bookedByTeam.toString() === bookedByTeam.toString()
             );
             if (teamAlreadyBooked) {
                 return res.status(400).json({
-                    message: 'Your team has already booked this time slot.'
+                    success: false,
+                    message: 'Your team has already requested this time slot. Please wait for approval or choose another slot.'
                 });
             }
 
             // Check if opponent team has already booked this slot with a different opponent
-            const opponentAlreadyBooked = existingBookings.find(booking => 
+            const opponentAlreadyBooked = existingBookings.find(booking =>
                 booking.opponentTeam && booking.opponentTeam.toString() === opponentTeam.toString()
             );
             if (opponentAlreadyBooked) {
                 return res.status(400).json({
+                    success: false,
                     message: 'The opponent team is already booked in this slot with another team.'
                 });
             }
+
+            console.log('   ✅ Slot available for host_only booking');
 
         } else {
             // For regular and owner_play modes, only one booking allowed per slot
@@ -185,11 +206,16 @@ exports.bookGround = async (req, res) => {
                 status: { $in: ['pending', 'booked'] }
             });
 
+            console.log('   📋 Existing regular/owner_play booking:', existingBooking ? 'YES' : 'NO');
+
             if (existingBooking) {
                 return res.status(400).json({
+                    success: false,
                     message: 'This time slot is already booked or pending.'
                 });
             }
+
+            console.log('   ✅ Slot available for regular/owner_play booking');
         }
 
         // Create new booking
