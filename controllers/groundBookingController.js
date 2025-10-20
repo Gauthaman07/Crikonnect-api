@@ -283,7 +283,7 @@ exports.bookGround = async (req, res) => {
             console.log('   ➡️ Continuing with booking despite notification failure');
         }
 
-        // Send email notification
+        // Send email notification with timeout
         try {
             const mailOptions = {
                 from: process.env.EMAIL_USER,
@@ -310,7 +310,12 @@ exports.bookGround = async (req, res) => {
                 `
             };
 
-            await transporter.sendMail(mailOptions);
+            await Promise.race([
+                transporter.sendMail(mailOptions),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Email sending timeout')), 10000)
+                )
+            ]);
             console.log('✅ Email notification sent successfully');
         } catch (emailError) {
             console.error('⚠️ Email notification failed but continuing with booking:', emailError.message);
@@ -318,29 +323,35 @@ exports.bookGround = async (req, res) => {
 
         console.log('GUPSHUP_API_KEY:', process.env.GUPSHUP_API_KEY);
         console.log('GUPSHUP_SOURCE_NUMBER:', process.env.GUPSHUP_SOURCE_NUMBER);
-        // Send WhatsApp notification using Gupshup
+        // Send WhatsApp notification using Gupshup with timeout
         try {
-            const gupshupResponse = await axios.post(
-                'https://api.gupshup.io/wa/api/v1/template/msg',
-                new URLSearchParams({
-                    apiKey: process.env.GUPSHUP_API_KEY,
-                    source: process.env.GUPSHUP_SOURCE_NUMBER,
-                    destination: `+91${groundOwner.mobile}`,
-                    templateId: "ground_booking_request",  // Make sure this ID is correct
-                    params: JSON.stringify([
-                        groundOwner.name,
-                        team.teamName,
-                        ground.groundName,
-                        formattedDate,
-                        timeSlot
-                    ])
-                }).toString(),
-                {
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
+            const gupshupResponse = await Promise.race([
+                axios.post(
+                    'https://api.gupshup.io/wa/api/v1/template/msg',
+                    new URLSearchParams({
+                        apiKey: process.env.GUPSHUP_API_KEY,
+                        source: process.env.GUPSHUP_SOURCE_NUMBER,
+                        destination: `+91${groundOwner.mobile}`,
+                        templateId: "ground_booking_request",
+                        params: JSON.stringify([
+                            groundOwner.name,
+                            team.teamName,
+                            ground.groundName,
+                            formattedDate,
+                            timeSlot
+                        ])
+                    }).toString(),
+                    {
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        },
+                        timeout: 5000
                     }
-                }
-            );
+                ),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('WhatsApp API timeout')), 5000)
+                )
+            ]);
 
             console.log('WhatsApp template message sent successfully:', gupshupResponse.data);
         } catch (error) {
