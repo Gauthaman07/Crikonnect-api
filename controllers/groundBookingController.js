@@ -609,7 +609,7 @@ exports.getUserBookings = async (req, res) => {
             select: 'groundName location fee groundMaplink image ownedByTeam',
             populate: {
                 path: 'ownedByTeam',
-                select: 'teamName'
+                select: 'teamName teamLogo'
             }
         })
         .populate('bookedByTeam', 'teamName teamLogo')
@@ -643,6 +643,7 @@ exports.getUserBookings = async (req, res) => {
                 groundLocation: booking.groundId?.location || 'Unknown Location',
                 groundImage: booking.groundId?.image || null,
                 groundOwner: booking.groundId?.ownedByTeam?.teamName || 'Unknown Owner',
+                groundOwnerLogo: booking.groundId?.ownedByTeam?.teamLogo || null,
                 teamName: booking.bookedByTeam?.teamName || 'Unknown Team',
                 teamLogo: booking.bookedByTeam?.teamLogo || null,
                 opponentTeam: booking.opponentTeam ? {

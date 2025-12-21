@@ -454,7 +454,7 @@ const getPendingGuestRequests = async (req, res) => {
                         logo: request.teamA.teamLogo
                     },
                     teamB: {
-                        name: 'Your Team',
+                        name: ownerTeam.teamName,
                         logo: ownerTeam.teamLogo
                     },
                     groundName: request.groundId.groundName,
@@ -579,8 +579,136 @@ const getPendingGuestRequests = async (req, res) => {
     }
 };
 
+// Get user's bookings (bookings made by the user's teams)
+const getMyGuestRequests = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Find all teams where user is either creator or member
+        const userTeams = await Team.find({
+            $or: [
+                { createdBy: userId },
+                { members: userId }
+            ]
+        }).select('_id teamName');
+
+        if (userTeams.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: 'No teams found for this user',
+                bookings: []
+            });
+        }
+
+        // Get team IDs
+        const teamIds = userTeams.map(team => team._id);
+
+        // Find all bookings made by user's teams
+        const bookings = await GuestMatchRequest.find({
+            $or: [
+                { teamA: { $in: teamIds } },
+                { teamB: { $in: teamIds } }
+            ]
+        })
+        .populate({
+            path: 'groundId',
+            select: 'groundName location fee groundMaplink image ownedByTeam',
+            populate: {
+                path: 'ownedByTeam',
+                select: 'teamName teamLogo'
+            }
+        })
+        .populate('teamA', 'teamName teamLogo')
+        .populate('teamB', 'teamName teamLogo') 
+        .sort({ requestedDate: -1 }); // Most recent first
+
+        // Format the response
+        const formattedBookings = bookings.map(booking => {
+            const formattedDate = booking.requestedDate.toLocaleDateString('en-US', {
+                weekday: 'short',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+
+            // Determine match description based on booking type
+            let matchDescription = '';
+            let matchType = booking.matchType || 'regular';
+            
+            // Map matchType to old availabilityMode names for frontend compatibility if needed,
+            // or just use matchType logic.
+            // Backend uses: 'vs_owner', 'guest_vs_guest'
+            // Frontend expects: 'owner_play', 'host_only' (legacy) OR adapt to new values.
+            
+            // Let's normalize for Frontend compatibility:
+            let availabilityMode = 'regular';
+            if (matchType === 'vs_owner') availabilityMode = 'owner_play';
+            else if (matchType === 'guest_vs_guest') availabilityMode = 'host_only';
+
+            if (matchType === 'vs_owner') {
+                matchDescription = `${booking.teamA?.teamName} vs ${booking.groundId?.ownedByTeam?.teamName || 'Ground Owner'}`;
+            } else if (matchType === 'guest_vs_guest' && booking.teamB) {
+                matchDescription = `${booking.teamA?.teamName} vs ${booking.teamB?.teamName}`;
+            } else {
+                matchDescription = `${booking.teamA?.teamName} (Waiting for Opponent)`;
+            }
+
+            // Map status 'approved' -> 'booked' for frontend compatibility
+            let status = booking.status;
+            if (status === 'approved') status = 'booked';
+
+            return {
+                bookingId: booking._id,
+                groundName: booking.groundId?.groundName || 'Unknown Ground',
+                groundLocation: booking.groundId?.location || 'Unknown Location',
+                groundImage: booking.groundId?.image || null,
+                groundOwner: booking.groundId?.ownedByTeam?.teamName || 'Unknown Owner',
+                groundOwnerLogo: booking.groundId?.ownedByTeam?.teamLogo || null,
+                teamName: booking.teamA?.teamName || 'Unknown Team',
+                teamLogo: booking.teamA?.teamLogo || null,
+                opponentTeam: booking.teamB ? {
+                    name: booking.teamB.teamName,
+                    logo: booking.teamB.teamLogo
+                } : null,
+                bookedDate: formattedDate, // Frontend expects 'bookedDate' string
+                timeSlot: booking.timeSlot,
+                status: status,
+                fee: booking.matchFee || 0,
+                groundMaplink: booking.groundId?.groundMaplink || null,
+                createdAt: booking.createdAt,
+                responseNote: booking.responseNote,
+                
+                // Enhanced fields
+                matchType: availabilityMode, // Send 'owner_play'/'host_only'
+                matchDescription: matchDescription,
+                isChallenge: matchType === 'vs_owner',
+                isHosting: matchType === 'guest_vs_guest',
+                // Status styling helper
+                statusColor: status === 'booked' ? 'green' : 
+                           status === 'rejected' ? 'red' : 'orange'
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'User bookings retrieved successfully',
+            bookings: formattedBookings,
+            totalBookings: formattedBookings.length
+        });
+
+    } catch (error) {
+        console.error('Error fetching user bookings:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     requestGuestMatch,
     respondToGuestMatch,
-    getPendingGuestRequests
+    getPendingGuestRequests,
+    getMyGuestRequests
 };

@@ -3,7 +3,8 @@ const router = express.Router();
 const {
     requestGuestMatch,
     respondToGuestMatch,
-    getPendingGuestRequests
+    getPendingGuestRequests,
+    getMyGuestRequests
 } = require('../controllers/guestMatchController');
 const authenticateUser = require('../middleware/authenticateUser');
 
@@ -15,5 +16,8 @@ router.put('/respond/:requestId', authenticateUser, respondToGuestMatch);
 
 // Get pending guest match requests for ground owner
 router.get('/pending', authenticateUser, getPendingGuestRequests);
+
+// Get user's guest match requests (My Bookings)
+router.get('/my-bookings', authenticateUser, getMyGuestRequests);
 
 module.exports = router;
