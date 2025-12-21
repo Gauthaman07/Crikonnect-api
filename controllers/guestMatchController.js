@@ -8,9 +8,10 @@ const transporter = require('../config/emailConfig');
 
 // Helper function to get Monday of the week
 const getMondayOfWeek = (date) => {
-    const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(date.setDate(diff));
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
     monday.setHours(0, 0, 0, 0);
     return monday;
 };
