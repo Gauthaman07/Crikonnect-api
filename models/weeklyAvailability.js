@@ -12,71 +12,85 @@ const weeklyAvailabilitySchema = new Schema({
         monday: {
             morning: {
                 mode: { type: String, enum: ['owner_play', 'host_only', 'unavailable'], default: 'unavailable' },
-                guestMatchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
+                guestMatchRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest' }],
+                bookedMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
             },
             afternoon: {
                 mode: { type: String, enum: ['owner_play', 'host_only', 'unavailable'], default: 'unavailable' },
-                guestMatchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
+                guestMatchRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest' }],
+                bookedMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
             }
         },
         tuesday: {
             morning: {
                 mode: { type: String, enum: ['owner_play', 'host_only', 'unavailable'], default: 'unavailable' },
-                guestMatchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
+                guestMatchRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest' }],
+                bookedMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
             },
             afternoon: {
                 mode: { type: String, enum: ['owner_play', 'host_only', 'unavailable'], default: 'unavailable' },
-                guestMatchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
+                guestMatchRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest' }],
+                bookedMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
             }
         },
         wednesday: {
             morning: {
                 mode: { type: String, enum: ['owner_play', 'host_only', 'unavailable'], default: 'unavailable' },
-                guestMatchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
+                guestMatchRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest' }],
+                bookedMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
             },
             afternoon: {
                 mode: { type: String, enum: ['owner_play', 'host_only', 'unavailable'], default: 'unavailable' },
-                guestMatchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
+                guestMatchRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest' }],
+                bookedMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
             }
         },
         thursday: {
             morning: {
                 mode: { type: String, enum: ['owner_play', 'host_only', 'unavailable'], default: 'unavailable' },
-                guestMatchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
+                guestMatchRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest' }],
+                bookedMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
             },
             afternoon: {
                 mode: { type: String, enum: ['owner_play', 'host_only', 'unavailable'], default: 'unavailable' },
-                guestMatchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
+                guestMatchRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest' }],
+                bookedMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
             }
         },
         friday: {
             morning: {
                 mode: { type: String, enum: ['owner_play', 'host_only', 'unavailable'], default: 'unavailable' },
-                guestMatchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
+                guestMatchRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest' }],
+                bookedMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
             },
             afternoon: {
                 mode: { type: String, enum: ['owner_play', 'host_only', 'unavailable'], default: 'unavailable' },
-                guestMatchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
+                guestMatchRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest' }],
+                bookedMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
             }
         },
         saturday: {
             morning: {
                 mode: { type: String, enum: ['owner_play', 'host_only', 'unavailable'], default: 'unavailable' },
-                guestMatchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
+                guestMatchRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest' }],
+                bookedMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
             },
             afternoon: {
                 mode: { type: String, enum: ['owner_play', 'host_only', 'unavailable'], default: 'unavailable' },
-                guestMatchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
+                guestMatchRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest' }],
+                bookedMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
             }
         },
         sunday: {
             morning: {
                 mode: { type: String, enum: ['owner_play', 'host_only', 'unavailable'], default: 'unavailable' },
-                guestMatchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
+                guestMatchRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest' }],
+                bookedMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
             },
             afternoon: {
                 mode: { type: String, enum: ['owner_play', 'host_only', 'unavailable'], default: 'unavailable' },
-                guestMatchRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
+                guestMatchRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest' }],
+                bookedMatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'GuestMatchRequest', default: null }
             }
         }
     },

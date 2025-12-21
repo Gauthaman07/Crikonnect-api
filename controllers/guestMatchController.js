@@ -29,18 +29,14 @@ const requestGuestMatch = async (req, res) => {
         } = req.body;
         
         // Validation
-        if (!groundId || !requestedDate || !timeSlot || !teamAId || !teamBId) {
+        if (!groundId || !requestedDate || !timeSlot || !teamAId) {
             return res.status(400).json({ 
-                message: 'Required fields missing: groundId, requestedDate, timeSlot, teamAId, teamBId' 
+                message: 'Required fields missing: groundId, requestedDate, timeSlot, teamAId' 
             });
         }
         
         if (!['morning', 'afternoon'].includes(timeSlot)) {
             return res.status(400).json({ message: 'Invalid time slot.' });
-        }
-        
-        if (teamAId === teamBId) {
-            return res.status(400).json({ message: 'Teams must be different.' });
         }
         
         // Verify user is part of teamA (requesting team)
@@ -67,12 +63,6 @@ const requestGuestMatch = async (req, res) => {
             });
         }
         
-        // Verify teamB exists
-        const opponentTeam = await Team.findById(teamBId);
-        if (!opponentTeam) {
-            return res.status(404).json({ message: 'Opponent team not found.' });
-        }
-        
         // Get the Monday of the requested week
         const requestedDateObj = new Date(requestedDate);
         const monday = getMondayOfWeek(requestedDateObj);
@@ -93,117 +83,152 @@ const requestGuestMatch = async (req, res) => {
         const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         const dayName = dayNames[requestedDateObj.getDay()];
         
-        // Check if the slot is available for guest matches
         const slot = weeklyAvailability.schedule[dayName][timeSlot];
-        if (slot.mode !== 'guest_match') {
+        
+        // Check availability
+        if (slot.bookedMatchId) {
             return res.status(400).json({ 
-                message: 'This slot is not available for guest matches.' 
+                message: 'This slot is already booked.' 
             });
         }
-        
-        if (slot.guestMatchRequest) {
+
+        if (slot.mode === 'unavailable') {
             return res.status(400).json({ 
-                message: 'This slot already has a pending guest match request.' 
+                message: 'This slot is unavailable.' 
             });
         }
-        
-        // Create guest match request
-        const guestMatchRequest = new GuestMatchRequest({
-            groundId,
-            ownerTeamId: ground.ownedByTeam._id,
-            requestedDate: requestedDateObj,
-            timeSlot,
-            teamA: teamAId,
-            teamB: teamBId,
-            requestedBy: userId,
-            matchDescription: matchDescription || '',
-            weeklyAvailabilityId: weeklyAvailability._id,
-            matchFee: ground.fee || 0
-        });
-        
-        await guestMatchRequest.save();
-        
-        // Update the weekly availability slot
-        weeklyAvailability.schedule[dayName][timeSlot].guestMatchRequest = guestMatchRequest._id;
-        await weeklyAvailability.save();
-        
-        // Get ground owner details for notifications
-        const groundOwner = await User.findById(ground.ownedByTeam.createdBy);
-        
-        // Format date for notifications
-        const formattedDate = requestedDateObj.toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-        
-        // Send push notification to ground owner
-        try {
-            const notificationTitle = 'New Guest Match Request';
-            const notificationBody = `${requestingTeam.teamName} vs ${opponentTeam.teamName} wants to play at ${ground.groundName} on ${formattedDate} ${timeSlot}`;
+
+        // --- CORE LOGIC START ---
+
+        let requestToSave = null;
+        let isMerge = false;
+        let finalTeamBId = teamBId;
+        let matchType = 'guest_vs_guest';
+
+        // CASE 1: OWNER PLAY
+        if (slot.mode === 'owner_play') {
+            matchType = 'vs_owner';
+            finalTeamBId = ground.ownedByTeam._id; // Force Team B to be Owner
+        } 
+        // CASE 2: HOST ONLY
+        else if (slot.mode === 'host_only') {
+            matchType = 'guest_vs_guest';
             
-            const notificationData = {
-                requestId: guestMatchRequest._id.toString(),
-                groundId: ground._id.toString(),
-                groundName: ground.groundName,
-                teamA: requestingTeam.teamName,
-                teamB: opponentTeam.teamName,
-                date: formattedDate,
+            // If teamB NOT provided, try Auto-Pairing
+            if (!finalTeamBId) {
+                // Find a pending SINGLE request for this slot
+                const existingSingle = await GuestMatchRequest.findOne({
+                    weeklyAvailabilityId: weeklyAvailability._id,
+                    requestedDate: requestedDateObj,
+                    timeSlot: timeSlot,
+                    teamB: null, // Looking for a lonely team
+                    status: 'pending',
+                    matchType: 'guest_vs_guest'
+                });
+
+                if (existingSingle) {
+                    // Prevent self-matching
+                    if (existingSingle.teamA.toString() === teamAId) {
+                        return res.status(400).json({ message: 'You already have a pending request for this slot.' });
+                    }
+
+                    // MERGE!
+                    existingSingle.teamB = teamAId; // Current team becomes Team B of the match
+                    await existingSingle.save();
+                    
+                    isMerge = true;
+                    requestToSave = existingSingle;
+                    finalTeamBId = existingSingle.teamB; // for notification
+                }
+                // If no single exists, we fall through to create a new one (with teamB = null)
+            }
+        }
+
+        // If not a merge, create NEW Request
+        if (!isMerge) {
+            // Validate Team B if provided
+            if (finalTeamBId) {
+                if (finalTeamBId.toString() === teamAId) {
+                    return res.status(400).json({ message: 'Teams must be different.' });
+                }
+            }
+
+            // Check for duplicate request from same team (to prevent spam)
+            // Note: We search in the array of IDs
+            // This is a bit complex with just IDs, so we query the Collection
+            const existingRequest = await GuestMatchRequest.findOne({
+                weeklyAvailabilityId: weeklyAvailability._id,
+                requestedDate: requestedDateObj,
                 timeSlot: timeSlot,
-                type: 'guest_match_request'
-            };
+                teamA: teamAId,
+                status: 'pending'
+            });
+
+             if (existingRequest) {
+                return res.status(400).json({ message: 'You already have a pending request for this slot.' });
+            }
+
+            requestToSave = new GuestMatchRequest({
+                groundId,
+                ownerTeamId: ground.ownedByTeam._id,
+                requestedDate: requestedDateObj,
+                timeSlot,
+                teamA: teamAId,
+                teamB: finalTeamBId || null, // Can be null for Host Only Single
+                matchType,
+                requestedBy: userId,
+                matchDescription: matchDescription || '',
+                weeklyAvailabilityId: weeklyAvailability._id,
+                matchFee: ground.fee || 0
+            });
             
+            await requestToSave.save();
+
+            // Add to Weekly Availability Array
+            weeklyAvailability.schedule[dayName][timeSlot].guestMatchRequests.push(requestToSave._id);
+            await weeklyAvailability.save();
+        }
+
+        // --- NOTIFICATIONS ---
+        
+        // Get ground owner
+        const groundOwner = await User.findById(ground.ownedByTeam.createdBy);
+        // Get opponent name (if exists)
+        let opponentName = "Waiting for Opponent";
+        if (finalTeamBId) {
+            const oppTeam = await Team.findById(finalTeamBId);
+            opponentName = oppTeam ? oppTeam.teamName : "Unknown";
+        }
+        
+        const formattedDate = requestedDateObj.toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+
+        // Construct Message
+        const title = isMerge ? 'Match Paired & Ready!' : 'New Guest Match Request';
+        const body = isMerge 
+            ? `Match Paired: ${requestingTeam.teamName} has joined the slot vs ${opponentName}. Ready for your approval.`
+            : `${requestingTeam.teamName} requested a slot (${matchType === 'vs_owner' ? 'vs You' : 'Host Only'}).`;
+
+        // Send Notification
+        try {
             await sendPushNotification(
                 groundOwner._id,
-                { title: notificationTitle, body: notificationBody },
-                notificationData
+                { title, body },
+                {
+                    requestId: requestToSave._id.toString(),
+                    type: 'guest_match_request'
+                }
             );
-            
             console.log('Push notification sent to ground owner');
-        } catch (pushError) {
-            console.error('Error sending push notification:', pushError);
-        }
-        
-        // Send email notification
-        try {
-            const mailOptions = {
-                from: process.env.EMAIL_USER,
-                to: groundOwner.email,
-                subject: 'New Guest Match Request',
-                html: `
-                    <h2>New Guest Match Request</h2>
-                    <p>You have received a new guest match request for your ground.</p>
-                    <h3>Match Details:</h3>
-                    <ul>
-                        <li><strong>Teams:</strong> ${requestingTeam.teamName} vs ${opponentTeam.teamName}</li>
-                        <li><strong>Ground:</strong> ${ground.groundName}</li>
-                        <li><strong>Date:</strong> ${formattedDate}</li>
-                        <li><strong>Time Slot:</strong> ${timeSlot}</li>
-                        <li><strong>Match Fee:</strong> ₹${ground.fee || 0}</li>
-                        ${matchDescription ? `<li><strong>Description:</strong> ${matchDescription}</li>` : ''}
-                    </ul>
-                    <p>Please log in to your account to approve or reject this request.</p>
-                `
-            };
-            
-            await transporter.sendMail(mailOptions);
-        } catch (emailError) {
-            console.error('Error sending email:', emailError);
-        }
-        
+        } catch (e) { console.error('Push error', e); }
+
+        // Response
         res.status(201).json({
             success: true,
-            message: 'Guest match request created successfully.',
-            request: {
-                requestId: guestMatchRequest._id,
-                groundName: ground.groundName,
-                date: formattedDate,
-                timeSlot,
-                teamA: requestingTeam.teamName,
-                teamB: opponentTeam.teamName,
-                status: 'pending'
-            }
+            message: isMerge ? 'Match paired successfully! Waiting for owner approval.' : 'Request sent successfully.',
+            request: requestToSave,
+            isMerged: isMerge
         });
         
     } catch (error) {
@@ -251,10 +276,33 @@ const respondToGuestMatch = async (req, res) => {
             });
         }
         
+        // Allow re-approving if it was just pending, but not if already finalized (unless we want to allow overwrites, but let's be safe)
         if (guestRequest.status !== 'pending') {
             return res.status(400).json({ 
                 message: 'This request has already been responded to.' 
             });
+        }
+
+        // Check if teamB is present (cannot approve single team request)
+        if (dbStatus === 'approved' && !guestRequest.teamB) {
+             return res.status(400).json({ 
+                message: 'Cannot approve a request with only one team. Wait for another team to join.' 
+            });
+        }
+
+        // Find Weekly Availability to update schedule
+        const weeklyAvailability = await WeeklyAvailability.findById(guestRequest.weeklyAvailabilityId);
+        if (!weeklyAvailability) {
+            return res.status(404).json({ message: 'Weekly availability not found.' });
+        }
+        
+        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const dayName = dayNames[guestRequest.requestedDate.getDay()];
+        const slot = weeklyAvailability.schedule[dayName][guestRequest.timeSlot];
+
+        // Check if slot is already booked (double safety)
+        if (dbStatus === 'approved' && slot.bookedMatchId) {
+             return res.status(400).json({ message: 'This slot is already booked by another team.' });
         }
         
         // Update request status
@@ -264,99 +312,73 @@ const respondToGuestMatch = async (req, res) => {
         guestRequest.respondedBy = userId;
         await guestRequest.save();
         
-        // If rejected, clear the guest match request from weekly availability
-        if (dbStatus === 'rejected') {
-            const weeklyAvailability = await WeeklyAvailability.findById(guestRequest.weeklyAvailabilityId);
-            if (weeklyAvailability) {
-                const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-                const dayName = dayNames[guestRequest.requestedDate.getDay()];
-                
-                if (weeklyAvailability.schedule[dayName][guestRequest.timeSlot].guestMatchRequest?.toString() === requestId) {
-                    weeklyAvailability.schedule[dayName][guestRequest.timeSlot].guestMatchRequest = null;
-                    await weeklyAvailability.save();
+        // HANDLE APPROVAL LOGIC
+        if (dbStatus === 'approved') {
+            // 1. Mark slot as booked
+            weeklyAvailability.schedule[dayName][guestRequest.timeSlot].bookedMatchId = guestRequest._id;
+            
+            // 2. Reject ALL other pending requests for this slot
+            // Get all request IDs for this slot
+            const allRequests = weeklyAvailability.schedule[dayName][guestRequest.timeSlot].guestMatchRequests || [];
+            
+            for (const otherRequestId of allRequests) {
+                if (otherRequestId.toString() !== requestId) {
+                    await GuestMatchRequest.findByIdAndUpdate(otherRequestId, {
+                        status: 'rejected',
+                        responseDate: new Date(),
+                        responseNote: 'Slot booked by another team.',
+                        respondedBy: userId
+                    });
                 }
+            }
+            
+            // 3. Keep the requests in history, or clear them?
+            // Let's keep them in the array for now so the owner can see history, 
+            // but the `bookedMatchId` flag indicates the active one.
+            
+            await weeklyAvailability.save();
+        }
+        
+        // HANDLE REJECTION LOGIC
+        if (dbStatus === 'rejected') {
+            // If we reject a merged match (A vs B), what happens?
+            // Ideally, it just dies. They have to request again.
+            // Remove from active array?
+             const index = weeklyAvailability.schedule[dayName][guestRequest.timeSlot].guestMatchRequests.indexOf(requestId);
+            if (index > -1) {
+                weeklyAvailability.schedule[dayName][guestRequest.timeSlot].guestMatchRequests.splice(index, 1);
+                await weeklyAvailability.save();
             }
         }
         
-        // Get requesting team owner for notifications
+        // NOTIFICATIONS (Standard Logic)
         const requestingTeamOwner = await User.findById(guestRequest.teamA.createdBy);
-        
-        // Format date for notifications
         const formattedDate = guestRequest.requestedDate.toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
         });
         
-        // Send push notification to requesting team
         try {
-            const notificationTitle = `Guest Match Request ${dbStatus === 'approved' ? 'Approved' : 'Rejected'}`;
+            const notificationTitle = `Match Request ${dbStatus === 'approved' ? 'Approved' : 'Rejected'}`;
             const notificationBody = `Your match request for ${guestRequest.groundId.groundName} on ${formattedDate} has been ${dbStatus}.`;
-            
-            const notificationData = {
-                requestId: guestRequest._id.toString(),
-                groundId: guestRequest.groundId._id.toString(),
-                groundName: guestRequest.groundId.groundName,
-                date: formattedDate,
-                timeSlot: guestRequest.timeSlot,
-                status: dbStatus,
-                type: 'guest_match_response'
-            };
             
             await sendPushNotification(
                 requestingTeamOwner._id,
                 { title: notificationTitle, body: notificationBody },
-                notificationData
+                {
+                    requestId: guestRequest._id.toString(),
+                    status: dbStatus,
+                    type: 'guest_match_response'
+                }
             );
-            
             console.log('Push notification sent to requesting team');
-        } catch (pushError) {
-            console.error('Error sending push notification:', pushError);
-        }
+        } catch (pushError) { console.error('Error sending push notification:', pushError); }
         
-        // Send email notification
-        try {
-            const mailOptions = {
-                from: process.env.EMAIL_USER,
-                to: requestingTeamOwner.email,
-                subject: `Guest Match Request ${dbStatus === 'approved' ? 'Approved' : 'Rejected'}`,
-                html: `
-                    <h2>Match Request ${dbStatus === 'approved' ? 'Approved' : 'Rejected'}</h2>
-                    <p>Your guest match request has been ${dbStatus}.</p>
-                    <h3>Match Details:</h3>
-                    <ul>
-                        <li><strong>Teams:</strong> ${guestRequest.teamA.teamName} vs ${guestRequest.teamB.teamName}</li>
-                        <li><strong>Ground:</strong> ${guestRequest.groundId.groundName}</li>
-                        <li><strong>Date:</strong> ${formattedDate}</li>
-                        <li><strong>Time Slot:</strong> ${guestRequest.timeSlot}</li>
-                        ${status === 'approved' ? `
-                            <li><strong>Match Fee:</strong> ₹${guestRequest.matchFee}</li>
-                            <li><strong>Ground Location:</strong> ${guestRequest.groundId.location}</li>
-                        ` : ''}
-                    </ul>
-                    ${responseNote ? `<p><strong>Note from ground owner:</strong> ${responseNote}</p>` : ''}
-                    ${status === 'approved' ? 
-                        '<p>Please ensure your team arrives on time and follows all ground rules.</p>' : 
-                        '<p>You can try booking another available slot.</p>'
-                    }
-                `
-            };
-            
-            await transporter.sendMail(mailOptions);
-        } catch (emailError) {
-            console.error('Error sending email:', emailError);
-        }
+        // Note: In a real app, we should also notify Team B if it exists.
         
         res.status(200).json({
             success: true,
             message: `Guest match request ${status} successfully.`,
-            request: {
-                requestId: guestRequest._id,
-                status: dbStatus,
-                responseDate: guestRequest.responseDate,
-                responseNote: guestRequest.responseNote
-            }
+            request: guestRequest
         });
         
     } catch (error) {

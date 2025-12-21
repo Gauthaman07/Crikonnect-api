@@ -11,7 +11,7 @@ const guestMatchRequestSchema = new Schema({
     
     // Teams involved
     teamA: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: true }, // Requesting team
-    teamB: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' }, // Opponent team (null for owner_play mode)
+    teamB: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: false }, // Opponent team (null for owner_play mode or pending host_only)
     
     // Match type based on availability mode
     matchType: { type: String, enum: ['vs_owner', 'guest_vs_guest'], required: true },

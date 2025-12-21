@@ -1,5 +1,7 @@
 const Team = require('../models/team');
 const Ground = require('../models/ground');
+const Match = require('../models/match');
+const GuestMatchRequest = require('../models/guestMatchRequest');
 
 const createTeam = async (req, res) => {
     try {
@@ -92,6 +94,67 @@ const getTeamByUser = async (req, res) => {
             return res.status(404).json({ message: "No team found for this user." });
         }
 
+        // --- Fetch Next Match Logic ---
+        const teamId = team._id;
+        const now = new Date();
+        now.setHours(0, 0, 0, 0); // Include today's matches
+
+        // 1. Find upcoming Tournament Matches
+        const tournamentMatches = await Match.find({
+            $or: [{ team1: teamId }, { team2: teamId }],
+            matchDate: { $gte: now },
+            status: 'scheduled'
+        }).sort({ matchDate: 1 }).limit(1);
+
+        // 2. Find upcoming Guest Matches (Friendly)
+        const guestMatches = await GuestMatchRequest.find({
+            $or: [
+                { teamA: teamId },
+                { teamB: teamId },
+                { ownerTeamId: teamId, matchType: 'vs_owner' }
+            ],
+            requestedDate: { $gte: now },
+            status: 'approved'
+        }).sort({ requestedDate: 1 }).limit(1);
+
+        // 3. Determine the nearest match
+        let nextMatch = null;
+        const tMatch = tournamentMatches[0];
+        const gMatch = guestMatches[0];
+
+        if (tMatch && gMatch) {
+            // Compare dates
+            nextMatch = tMatch.matchDate < gMatch.requestedDate ? tMatch : gMatch;
+        } else if (tMatch) {
+            nextMatch = tMatch;
+        } else if (gMatch) {
+            nextMatch = gMatch;
+        }
+
+        // Format the next match string
+        let nextMatchString = null;
+        if (nextMatch) {
+            const dateObj = nextMatch.matchDate || nextMatch.requestedDate;
+            const timeSlot = nextMatch.timeSlot; // 'morning', 'afternoon' or specific time
+            
+            // Format date: "25 Dec"
+            const dateOptions = { day: 'numeric', month: 'short' };
+            const dateStr = new Date(dateObj).toLocaleDateString('en-US', dateOptions);
+            
+            // Format time: Capitalize first letter
+            const timeStr = timeSlot.charAt(0).toUpperCase() + timeSlot.slice(1);
+
+            // "25 Dec, Morning"
+            nextMatchString = `${dateStr}, ${timeStr}`;
+            
+            // Check if it's today
+            const today = new Date();
+            if (dateObj.toDateString() === today.toDateString()) {
+                 nextMatchString = `Today, ${timeStr}`;
+            }
+        }
+        // -----------------------------
+
         // Structure the response
         const response = {
             _id: team._id,
@@ -100,6 +163,7 @@ const getTeamByUser = async (req, res) => {
             location: team.location,
             hasOwnGround: team.hasOwnGround,
             createdBy: team.createdBy,
+            nextMatch: nextMatchString, // Add this field
             groundDetails: team.hasOwnGround && team.groundId
                 ? {
                     groundName: team.groundId.groundName,
