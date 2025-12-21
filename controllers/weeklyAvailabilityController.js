@@ -38,7 +38,7 @@ const createDefaultSchedule = () => {
     return schedule;
 };
 
-// Auto-generate next week's availability (copying from previous week)
+// Auto-generate availability for the next 3 weeks (copying from previous week)
 const generateNextWeekAvailability = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -57,23 +57,12 @@ const generateNextWeekAvailability = async (req, res) => {
         
         // Get current week's Monday
         const currentMonday = getMondayOfWeek(new Date());
-        const nextMonday = new Date(currentMonday);
-        nextMonday.setDate(currentMonday.getDate() + 7);
-        const nextSunday = getSundayOfWeek(nextMonday);
         
-        // Check if next week already exists
-        const existingNextWeek = await WeeklyAvailability.findOne({
-            groundId: ownerTeam.groundId._id,
-            weekStartDate: nextMonday
-        });
-        
-        if (existingNextWeek) {
-            return res.status(400).json({ 
-                message: 'Next week availability already exists.' 
-            });
-        }
-        
-        // Find current week's availability
+        // We will generate for next 3 weeks
+        const weeksToGenerate = 3;
+        const results = [];
+
+        // Find current week's availability (as template)
         const currentWeek = await WeeklyAvailability.findOne({
             groundId: ownerTeam.groundId._id,
             weekStartDate: currentMonday
@@ -93,26 +82,44 @@ const generateNextWeekAvailability = async (req, res) => {
                 scheduleTemplate[day].afternoon.bookedMatchId = null;
             });
         }
-        
-        // Create next week's availability
-        const nextWeekAvailability = new WeeklyAvailability({
-            groundId: ownerTeam.groundId._id,
-            ownerTeamId: ownerTeam._id,
-            weekStartDate: nextMonday,
-            weekEndDate: nextSunday,
-            schedule: scheduleTemplate
-        });
-        
-        await nextWeekAvailability.save();
+
+        // Loop to generate future weeks
+        for (let i = 1; i <= weeksToGenerate; i++) {
+            const nextMonday = new Date(currentMonday);
+            nextMonday.setDate(currentMonday.getDate() + (7 * i));
+            const nextSunday = getSundayOfWeek(nextMonday);
+            
+            // Check if this week already exists
+            const existingWeek = await WeeklyAvailability.findOne({
+                groundId: ownerTeam.groundId._id,
+                weekStartDate: nextMonday
+            });
+            
+            if (!existingWeek) {
+                // Create new weekly availability
+                const newWeekAvailability = new WeeklyAvailability({
+                    groundId: ownerTeam.groundId._id,
+                    ownerTeamId: ownerTeam._id,
+                    weekStartDate: nextMonday,
+                    weekEndDate: nextSunday,
+                    schedule: scheduleTemplate
+                });
+                
+                await newWeekAvailability.save();
+                results.push({ week: i, startDate: nextMonday, status: 'created' });
+            } else {
+                results.push({ week: i, startDate: nextMonday, status: 'exists' });
+            }
+        }
         
         res.status(201).json({
             success: true,
-            message: 'Next week availability generated successfully.',
-            availability: nextWeekAvailability
+            message: 'Future availability checks completed.',
+            details: results
         });
         
     } catch (error) {
-        console.error('Error generating next week availability:', error);
+        console.error('Error generating future availability:', error);
         res.status(500).json({
             success: false,
             message: 'Internal server error',
