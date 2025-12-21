@@ -84,6 +84,10 @@ const requestGuestMatch = async (req, res) => {
         const dayName = dayNames[requestedDateObj.getDay()];
         
         const slot = weeklyAvailability.schedule[dayName][timeSlot];
+
+        console.log(`DEBUG: Requesting ${dayName} ${timeSlot} on ${requestedDate}`);
+        console.log(`DEBUG: Slot Mode: ${slot.mode}`);
+        console.log(`DEBUG: Booked Match ID: ${slot.bookedMatchId}`);
         
         // Check availability
         if (slot.bookedMatchId) {
