@@ -30,8 +30,8 @@ const createDefaultSchedule = () => {
     
     days.forEach(day => {
         schedule[day] = {
-            morning: { mode: 'unavailable', guestMatchRequest: null },
-            afternoon: { mode: 'unavailable', guestMatchRequest: null }
+            morning: { mode: 'unavailable', guestMatchRequests: [], bookedMatchId: null },
+            afternoon: { mode: 'unavailable', guestMatchRequests: [], bookedMatchId: null }
         };
     });
     
@@ -82,13 +82,15 @@ const generateNextWeekAvailability = async (req, res) => {
         let scheduleTemplate = createDefaultSchedule();
         
         if (currentWeek) {
-            // Copy current week's schedule as template (without guest match requests)
+            // Copy current week's schedule as template
             scheduleTemplate = JSON.parse(JSON.stringify(currentWeek.schedule));
             
-            // Clear guest match requests for the new week
+            // Clear booking info for the new week
             Object.keys(scheduleTemplate).forEach(day => {
-                scheduleTemplate[day].morning.guestMatchRequest = null;
-                scheduleTemplate[day].afternoon.guestMatchRequest = null;
+                scheduleTemplate[day].morning.guestMatchRequests = [];
+                scheduleTemplate[day].morning.bookedMatchId = null;
+                scheduleTemplate[day].afternoon.guestMatchRequests = [];
+                scheduleTemplate[day].afternoon.bookedMatchId = null;
             });
         }
         
@@ -149,8 +151,14 @@ const getWeeklyAvailability = async (req, res) => {
             groundId: ownerTeam.groundId._id,
             weekStartDate: monday
         }).populate({
-            path: 'schedule.monday.morning.guestMatchRequest schedule.monday.afternoon.guestMatchRequest schedule.tuesday.morning.guestMatchRequest schedule.tuesday.afternoon.guestMatchRequest schedule.wednesday.morning.guestMatchRequest schedule.wednesday.afternoon.guestMatchRequest schedule.thursday.morning.guestMatchRequest schedule.thursday.afternoon.guestMatchRequest schedule.friday.morning.guestMatchRequest schedule.friday.afternoon.guestMatchRequest schedule.saturday.morning.guestMatchRequest schedule.saturday.afternoon.guestMatchRequest schedule.sunday.morning.guestMatchRequest schedule.sunday.afternoon.guestMatchRequest',
+            path: 'schedule.monday.morning.guestMatchRequests schedule.monday.afternoon.guestMatchRequests schedule.tuesday.morning.guestMatchRequests schedule.tuesday.afternoon.guestMatchRequests schedule.wednesday.morning.guestMatchRequests schedule.wednesday.afternoon.guestMatchRequests schedule.thursday.morning.guestMatchRequests schedule.thursday.afternoon.guestMatchRequests schedule.friday.morning.guestMatchRequests schedule.friday.afternoon.guestMatchRequests schedule.saturday.morning.guestMatchRequests schedule.saturday.afternoon.guestMatchRequests schedule.sunday.morning.guestMatchRequests schedule.sunday.afternoon.guestMatchRequests',
             populate: {
+                path: 'teamA teamB requestedBy',
+                select: 'teamName teamLogo name email'
+            }
+        }).populate({
+            path: 'schedule.monday.morning.bookedMatchId schedule.monday.afternoon.bookedMatchId schedule.tuesday.morning.bookedMatchId schedule.tuesday.afternoon.bookedMatchId schedule.wednesday.morning.bookedMatchId schedule.wednesday.afternoon.bookedMatchId schedule.thursday.morning.bookedMatchId schedule.thursday.afternoon.bookedMatchId schedule.friday.morning.bookedMatchId schedule.friday.afternoon.bookedMatchId schedule.saturday.morning.bookedMatchId schedule.saturday.afternoon.bookedMatchId schedule.sunday.morning.bookedMatchId schedule.sunday.afternoon.bookedMatchId',
+             populate: {
                 path: 'teamA teamB requestedBy',
                 select: 'teamName teamLogo name email'
             }
@@ -233,21 +241,19 @@ const updateDayTimeSlot = async (req, res) => {
             });
         }
         
-        // Check if there's an existing guest match request that needs to be handled
         const currentSlot = weeklyAvailability.schedule[day][timeSlot];
-        if (currentSlot.guestMatchRequest && !['owner_play', 'host_only'].includes(mode)) {
-            // If changing away from interactive modes, cancel any pending request
-            const guestRequest = await GuestMatchRequest.findById(currentSlot.guestMatchRequest);
-            if (guestRequest && guestRequest.status === 'pending') {
-                guestRequest.status = 'cancelled';
-                await guestRequest.save();
-            }
-        }
+
+        // If changing to 'unavailable', we should probably reject pending requests or at least warn
+        // For now, we will just keep the data but the slot becomes unavailable for new bookings
         
         // Update the specific day and time slot
+        // Preserve existing requests and bookings if just switching between active modes
+        const preserveData = ['owner_play', 'host_only'].includes(mode) && ['owner_play', 'host_only'].includes(currentSlot.mode);
+
         weeklyAvailability.schedule[day][timeSlot] = {
             mode: mode,
-            guestMatchRequest: ['owner_play', 'host_only'].includes(mode) ? currentSlot.guestMatchRequest : null
+            guestMatchRequests: preserveData ? currentSlot.guestMatchRequests : [],
+            bookedMatchId: preserveData ? currentSlot.bookedMatchId : null
         };
         
         weeklyAvailability.updatedAt = Date.now();
@@ -304,12 +310,16 @@ const getAvailableGuestSlots = async (req, res) => {
         days.forEach(day => {
             ['morning', 'afternoon'].forEach(timeSlot => {
                 const slot = weeklyAvailability.schedule[day][timeSlot];
-                if (['owner_play', 'host_only'].includes(slot.mode) && !slot.guestMatchRequest) {
+                
+                // Show slot if it is in a playable mode AND NOT BOOKED
+                // Pending requests do not hide the slot anymore (allowing multiple requests)
+                if (['owner_play', 'host_only'].includes(slot.mode) && !slot.bookedMatchId) {
                     availableSlots.push({
                         day,
                         timeSlot,
                         mode: slot.mode,
-                        date: new Date(monday.getTime() + (days.indexOf(day) * 24 * 60 * 60 * 1000))
+                        date: new Date(monday.getTime() + (days.indexOf(day) * 24 * 60 * 60 * 1000)),
+                        requestCount: slot.guestMatchRequests ? slot.guestMatchRequests.length : 0
                     });
                 }
             });

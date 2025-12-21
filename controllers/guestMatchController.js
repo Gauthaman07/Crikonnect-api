@@ -400,7 +400,7 @@ const getPendingGuestRequests = async (req, res) => {
         const ownerTeam = await Team.findOne({ 
             createdBy: userId, 
             hasOwnGround: true 
-        });
+        }).populate('groundId');
         
         if (!ownerTeam) {
             return res.status(404).json({ 
@@ -417,38 +417,151 @@ const getPendingGuestRequests = async (req, res) => {
         .populate('teamA', 'teamName teamLogo')
         .populate('teamB', 'teamName teamLogo')
         .populate('requestedBy', 'name email')
-        .sort({ createdAt: -1 });
+        .sort({ requestedDate: 1, timeSlot: 1, createdAt: -1 });
         
-        // Format the requests
-        const formattedRequests = pendingRequests.map(request => ({
-            requestId: request._id,
-            groundName: request.groundId.groundName,
-            groundLocation: request.groundId.location,
-            teamA: {
-                name: request.teamA.teamName,
-                logo: request.teamA.teamLogo
-            },
-            teamB: {
-                name: request.teamB.teamName,
-                logo: request.teamB.teamLogo
-            },
-            requestedBy: request.requestedBy.name,
-            date: request.requestedDate.toLocaleDateString('en-US', {
+        // Group pending bookings intelligently
+        const groupedRequests = [];
+        const processedRequests = new Set();
+        
+        for (const request of pendingRequests) {
+            if (processedRequests.has(request._id.toString())) {
+                continue;
+            }
+            
+            const requestDateStr = request.requestedDate.toISOString().split('T')[0];
+            const formattedDate = request.requestedDate.toLocaleDateString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric'
-            }),
-            timeSlot: request.timeSlot,
-            matchDescription: request.matchDescription,
-            matchFee: request.matchFee,
-            createdAt: request.createdAt
-        }));
+            });
+            
+            // Determine type based on matchType or structure
+            if (request.matchType === 'vs_owner') {
+                // Challenge match
+                groupedRequests.push({
+                    type: 'challenge_match',
+                    requestId: request._id,
+                    requestIds: [request._id],
+                    teamA: {
+                        id: request.teamA._id,
+                        name: request.teamA.teamName,
+                        logo: request.teamA.teamLogo
+                    },
+                    teamB: {
+                        name: 'Your Team',
+                        logo: ownerTeam.teamLogo
+                    },
+                    groundName: request.groundId.groundName,
+                    groundLocation: request.groundId.location,
+                    date: formattedDate,
+                    timeSlot: request.timeSlot,
+                    matchType: request.matchType,
+                    createdAt: request.createdAt,
+                    status: 'ready_for_approval'
+                });
+                
+                processedRequests.add(request._id.toString());
+                
+            } else if (request.matchType === 'guest_vs_guest') {
+                
+                // If teamB is already set (Merged/Paired Request)
+                if (request.teamB) {
+                     groupedRequests.push({
+                        type: 'host_match_complete',
+                        requestId: request._id,
+                        requestIds: [request._id],
+                        teamA: {
+                            id: request.teamA._id,
+                            name: request.teamA.teamName,
+                            logo: request.teamA.teamLogo
+                        },
+                        teamB: {
+                            id: request.teamB._id,
+                            name: request.teamB.teamName,
+                            logo: request.teamB.teamLogo
+                        },
+                        groundName: request.groundId.groundName,
+                        groundLocation: request.groundId.location,
+                        date: formattedDate,
+                        timeSlot: request.timeSlot,
+                        matchType: request.matchType,
+                        createdAt: request.createdAt,
+                        status: 'ready_for_approval'
+                    });
+                    processedRequests.add(request._id.toString());
+                } else {
+                    // Single Request - Waiting for Opponent
+                    groupedRequests.push({
+                        type: 'host_match_waiting',
+                        requestId: request._id,
+                        requestIds: [request._id],
+                        teamA: {
+                            id: request.teamA._id,
+                            name: request.teamA.teamName,
+                            logo: request.teamA.teamLogo
+                        },
+                        teamB: null,
+                        groundName: request.groundId.groundName,
+                        groundLocation: request.groundId.location,
+                        date: formattedDate,
+                        timeSlot: request.timeSlot,
+                        matchType: request.matchType,
+                        createdAt: request.createdAt,
+                        status: 'waiting_for_opponent'
+                    });
+                    processedRequests.add(request._id.toString());
+                }
+            }
+        }
+        
+        // Retrieve Confirmed Matches (for the tab)
+        // Find requests that are 'approved' (booked)
+         const confirmedRequests = await GuestMatchRequest.find({
+            ownerTeamId: ownerTeam._id,
+            status: 'approved',
+            requestedDate: { $gte: new Date() } // Future only
+        })
+        .populate('groundId', 'groundName location')
+        .populate('teamA', 'teamName teamLogo')
+        .populate('teamB', 'teamName teamLogo')
+        .sort({ requestedDate: 1 });
+
+        const confirmedMatches = confirmedRequests.map(match => {
+             const formattedDate = match.requestedDate.toLocaleDateString('en-US', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+            
+            let type = 'regular_booking';
+            if (match.matchType === 'vs_owner') type = 'challenge_match';
+            else if (match.matchType === 'guest_vs_guest') type = 'host_match';
+
+            return {
+                type,
+                matchId: match._id,
+                teamA: {
+                    id: match.teamA._id,
+                    name: match.teamA.teamName,
+                    logo: match.teamA.teamLogo
+                },
+                teamB: match.teamB ? {
+                    id: match.teamB._id,
+                    name: match.teamB.teamName,
+                    logo: match.teamB.teamLogo
+                } : null,
+                groundName: match.groundId.groundName,
+                groundLocation: match.groundId.location,
+                date: formattedDate,
+                timeSlot: match.timeSlot,
+                status: 'confirmed'
+            };
+        });
         
         res.status(200).json({
             success: true,
             message: 'Pending guest match requests retrieved successfully.',
-            requests: formattedRequests
+            pendingRequests: groupedRequests,
+            confirmedMatches: confirmedMatches
         });
         
     } catch (error) {
