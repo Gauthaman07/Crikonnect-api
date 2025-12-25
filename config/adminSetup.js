@@ -3,6 +3,7 @@ const AdminJSExpress = require('@adminjs/express');
 const AdminJSMongoose = require('@adminjs/mongoose');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const MongoStore = require('connect-mongo');
 
 // Register the Mongoose adapter
 AdminJS.registerAdapter(AdminJSMongoose);
@@ -64,13 +65,17 @@ const adminRouter = AdminJSExpress.buildAuthenticatedRouter(
     {
         authenticate,
         cookieName: 'adminjs',
-        cookiePassword: 'super-secret-password-change-this',
+        cookiePassword: process.env.COOKIE_PASSWORD || 'super-secret-password-change-this-in-env',
     },
     null,
     {
         resave: false,
-        saveUninitialized: true,
-        secret: 'super-secret-session-key-change-this', // Ensure this matches or is unique
+        saveUninitialized: false,
+        secret: process.env.SESSION_SECRET || 'super-secret-session-key',
+        store: MongoStore.create({
+            mongoUrl: process.env.MONGO_URI || 'mongodb://localhost:27017/sportsBooking',
+            collectionName: 'sessions' 
+        })
     }
 );
 

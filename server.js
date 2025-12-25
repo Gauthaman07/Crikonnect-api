@@ -1,5 +1,7 @@
 const express = require('express');
 const dotenv = require('dotenv');
+dotenv.config(); // Load env vars first
+
 const mongoose = require('mongoose');
 const cors = require('cors');
 const multer = require('multer');
@@ -17,8 +19,6 @@ const weeklyAvailabilityRoutes = require('./routes/weeklyAvailabilityRoutes');
 const guestMatchRoutes = require('./routes/guestMatchRoutes');
 const adminRouter = require('./config/adminSetup');
 
-
-dotenv.config();
 
 const app = express();
 
