@@ -5,6 +5,10 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const ConnectMongo = require('connect-mongo');
 const MongoStore = ConnectMongo.default || ConnectMongo;
+const { ComponentLoader } = require('adminjs');
+
+const componentLoader = new ComponentLoader();
+const Dashboard = componentLoader.add('Dashboard', './dashboard');
 
 // Register the Mongoose adapter
 AdminJS.registerAdapter(AdminJSMongoose);
@@ -23,6 +27,17 @@ const WeeklyAvailability = require('../models/weeklyAvailability');
 
 // AdminJS Options
 const adminOptions = {
+    componentLoader,
+    dashboard: {
+        component: Dashboard,
+        handler: async () => {
+            return {
+                users: await User.countDocuments(),
+                grounds: await Ground.countDocuments(),
+                tournaments: await Tournament.countDocuments(),
+            };
+        },
+    },
     resources: [
         // --- User Management ---
         {
