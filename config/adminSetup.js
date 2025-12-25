@@ -3,7 +3,8 @@ const AdminJSExpress = require('@adminjs/express');
 const AdminJSMongoose = require('@adminjs/mongoose');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const MongoStore = require('connect-mongo');
+const ConnectMongo = require('connect-mongo');
+const MongoStore = ConnectMongo.default || ConnectMongo;
 
 // Register the Mongoose adapter
 AdminJS.registerAdapter(AdminJSMongoose);
