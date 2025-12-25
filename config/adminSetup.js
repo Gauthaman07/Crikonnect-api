@@ -127,7 +127,7 @@ const adminOptions = {
     ],
     rootPath: '/admin',
     branding: {
-        companyName: 'Crickonnect Admin',
+        companyName: 'Crickonnect — Admin',
         logo: 'https://example.com/logo.png', 
         withMadeWithLove: false,
         theme: {
@@ -137,6 +137,7 @@ const adminOptions = {
                 primary60: '#ef9a9a',
                 primary40: '#ffcdd2',
                 primary20: '#ffebee',
+                accent: '#d32f2f', // Force accent color
             }
         }
     },
@@ -168,7 +169,13 @@ const authenticate = async (email, password) => {
         if (user && user.role === 'admin') {
             const matched = await bcrypt.compare(password, user.password);
             if (matched) {
-                return user;
+                // Return a simple object with 'title' for the UI
+                return {
+                    _id: user._id,
+                    email: user.email,
+                    role: user.role,
+                    title: user.name || user.email // Uses name if available
+                };
             }
         }
         return false;
