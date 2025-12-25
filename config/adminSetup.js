@@ -125,6 +125,25 @@ const adminOptions = {
             }
         }
     },
+    locale: {
+        translations: {
+            en: {
+                labels: {
+                    loginWelcome: 'Crickonnect Admin',
+                },
+                messages: {
+                    welcomeOnBoard_title: 'Crickonnect Dashboard',
+                    welcomeOnBoard_subtitle: 'Manage your entire cricket platform from here.',
+                    joinSlack_title: '', 
+                    joinSlack_content: '', 
+                    fromTheBrothers_title: '', 
+                    fromTheBrothers_content: '',
+                    addingResources_title: 'Getting Started',
+                    addingResources_content: 'Use the sidebar menu to manage Users, Grounds, and Matches.',
+                }
+            }
+        }
+    },
 };
 
 // Authentication Function
