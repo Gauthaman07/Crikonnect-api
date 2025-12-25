@@ -172,9 +172,9 @@ const authenticate = async (email, password) => {
                 // Return a simple object with 'title' for the UI
                 return {
                     _id: user._id,
-                    email: user.email,
+                    email: user.name, // Hack: Show Name instead of Email in the UI
                     role: user.role,
-                    title: user.name || user.email // Uses name if available
+                    title: user.name  // Show Name in the Title
                 };
             }
         }
