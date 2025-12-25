@@ -24,13 +24,13 @@ const WeeklyAvailability = require('../models/weeklyAvailability');
 // AdminJS Options
 const adminOptions = {
     resources: [
+        // --- User Management ---
         {
             resource: User,
             options: {
+                navigation: { name: 'User Management', icon: 'User' },
                 properties: {
-                    password: {
-                        isVisible: { list: false, filter: false, show: false, edit: true },
-                    },
+                    password: { isVisible: { list: false, filter: false, show: false, edit: true } },
                 },
                 actions: {
                     new: {
@@ -58,21 +58,72 @@ const adminOptions = {
                 },
             },
         },
-        Ground,
-        GroundBooking,
-        GuestMatchRequest,
-        HostOnlyRequest,
-        Match,
-        Team,
-        TeamTournamentRegistration,
-        Tournament,
-        WeeklyAvailability,
+        {
+            resource: Team,
+            options: { navigation: { name: 'User Management', icon: 'Users' } }
+        },
+
+        // --- Ground Management ---
+        {
+            resource: Ground,
+            options: { navigation: { name: 'Ground Management', icon: 'Map' } }
+        },
+        {
+            resource: GroundBooking,
+            options: { 
+                navigation: { name: 'Ground Management', icon: 'Calendar' },
+                properties: {
+                    status: {
+                        availableValues: [
+                            { value: 'pending', label: '⏳ Pending' },
+                            { value: 'booked', label: '✅ Booked' },
+                            { value: 'rejected', label: '❌ Rejected' }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            resource: WeeklyAvailability,
+            options: { navigation: { name: 'Ground Management', icon: 'Clock' } }
+        },
+
+        // --- Match Management ---
+        {
+            resource: Tournament,
+            options: { navigation: { name: 'Match Management', icon: 'Trophy' } }
+        },
+        {
+            resource: Match,
+            options: { navigation: { name: 'Match Management', icon: 'Activity' } }
+        },
+        {
+            resource: GuestMatchRequest,
+            options: { navigation: { name: 'Match Management', icon: 'Inbox' } }
+        },
+        {
+            resource: HostOnlyRequest,
+            options: { navigation: { name: 'Match Management', icon: 'Inbox' } }
+        },
+        {
+            resource: TeamTournamentRegistration,
+            options: { navigation: { name: 'Match Management', icon: 'Clipboard' } }
+        },
     ],
     rootPath: '/admin',
     branding: {
         companyName: 'Crickonnect Admin',
-        logo: 'https://example.com/logo.png', // You can replace this
-        softwareBrothers: false, // Hides the "SoftwareBrothers" link
+        logo: 'https://example.com/logo.png', 
+        withMadeWithLove: false,
+        theme: {
+            colors: {
+                primary100: '#d32f2f', // Red
+                primary80: '#e57373',
+                primary60: '#ef9a9a',
+                primary40: '#ffcdd2',
+                primary20: '#ffebee',
+            }
+        }
     },
 };
 
