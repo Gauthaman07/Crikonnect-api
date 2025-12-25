@@ -24,7 +24,40 @@ const WeeklyAvailability = require('../models/weeklyAvailability');
 // AdminJS Options
 const adminOptions = {
     resources: [
-        User,
+        {
+            resource: User,
+            options: {
+                properties: {
+                    password: {
+                        isVisible: { list: false, filter: false, show: false, edit: true },
+                    },
+                },
+                actions: {
+                    new: {
+                        before: async (request) => {
+                            if (request.payload.password) {
+                                request.payload = {
+                                    ...request.payload,
+                                    password: await bcrypt.hash(request.payload.password, 10),
+                                };
+                            }
+                            return request;
+                        },
+                    },
+                    edit: {
+                        before: async (request) => {
+                            if (request.payload.password) {
+                                request.payload = {
+                                    ...request.payload,
+                                    password: await bcrypt.hash(request.payload.password, 10),
+                                };
+                            }
+                            return request;
+                        },
+                    },
+                },
+            },
+        },
         Ground,
         GroundBooking,
         GuestMatchRequest,
