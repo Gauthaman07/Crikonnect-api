@@ -11,12 +11,16 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@adminjs/express": "^6.1.1",
+    "@adminjs/mongoose": "^4.1.0",
+    "adminjs": "^7.8.17",
     "axios": "^1.7.9",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^1.41.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.1",
+    "express-session": "^1.18.2",
     "firebase-admin": "^13.2.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
@@ -26,6 +30,7 @@
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.16",
     "pdfkit": "^0.17.1",
-    "streamifier": "^0.1.1"
+    "streamifier": "^0.1.1",
+    "tslib": "^2.8.1"
   }
 }

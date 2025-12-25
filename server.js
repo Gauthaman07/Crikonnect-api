@@ -15,11 +15,15 @@ const tournamentRoutes = require('./routes/tournamentRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const weeklyAvailabilityRoutes = require('./routes/weeklyAvailabilityRoutes');
 const guestMatchRoutes = require('./routes/guestMatchRoutes');
+const adminRouter = require('./config/adminSetup');
 
 
 dotenv.config();
 
 const app = express();
+
+// Admin Panel Router (Must be before body parsers)
+app.use('/admin', adminRouter);
 
 // Ensure the 'uploads' folder exists
 if (!fs.existsSync('./uploads')) {
@@ -79,6 +83,10 @@ mongoose.connect(MONGO_URI)
         // Start weekly schedule cron job after DB connection
         const { startWeeklyScheduleCron } = require('./services/weeklyScheduleService');
         startWeeklyScheduleCron();
+        
+        // Start match reminder cron job
+        const { startReminderCron } = require('./services/reminderService');
+        startReminderCron();
     })
     .catch(err => {
         console.error('Failed to connect to MongoDB:', err.message);
