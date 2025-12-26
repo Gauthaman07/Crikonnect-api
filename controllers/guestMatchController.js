@@ -41,16 +41,34 @@ const requestGuestMatch = async (req, res) => {
         }
         
         // Verify user is part of teamA (requesting team)
+        console.log(`DEBUG: Verifying user ${userId} is member of team ${teamAId}`);
+
         const requestingTeam = await Team.findOne({
             _id: teamAId,
             $or: [{ createdBy: userId }, { members: userId }]
         });
-        
+
+        console.log(`DEBUG: Team lookup result:`, requestingTeam ? `Found team: ${requestingTeam.teamName}` : 'Team not found or user not a member');
+
         if (!requestingTeam) {
-            return res.status(403).json({ 
-                message: 'You must be a member of the requesting team.' 
+            // Additional debug info
+            const teamExists = await Team.findById(teamAId);
+            if (!teamExists) {
+                console.log(`ERROR: Team ${teamAId} does not exist in database`);
+                return res.status(404).json({
+                    message: 'The specified team does not exist.'
+                });
+            }
+
+            console.log(`ERROR: User ${userId} is not a member of team ${teamAId}`);
+            console.log(`Team created by: ${teamExists.createdBy}, Members: ${teamExists.members}`);
+
+            return res.status(403).json({
+                message: 'You must be a member of the requesting team.'
             });
         }
+
+        console.log(`DEBUG: User verified as member of team ${requestingTeam.teamName}`);
         
         // Verify ground exists and get owner info
         const ground = await Ground.findById(groundId).populate('ownedByTeam');
