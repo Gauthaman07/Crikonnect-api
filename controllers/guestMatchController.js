@@ -89,12 +89,37 @@ const requestGuestMatch = async (req, res) => {
         console.log(`DEBUG: Requesting ${dayName} ${timeSlot} on ${requestedDate}`);
         console.log(`DEBUG: Slot Mode: ${slot.mode}`);
         console.log(`DEBUG: Booked Match ID: ${slot.bookedMatchId}`);
-        
-        // Check availability
+
+        // Check availability - Verify bookedMatchId actually exists
         if (slot.bookedMatchId) {
-            return res.status(400).json({ 
-                message: 'This slot is already booked.' 
-            });
+            // Validate that the booking actually exists in the database
+            const existingBooking = await GuestMatchRequest.findById(slot.bookedMatchId);
+
+            if (existingBooking && existingBooking.status === 'approved') {
+                // Valid booking exists
+                return res.status(400).json({
+                    message: 'This slot is already booked.'
+                });
+            } else {
+                // Stale reference - clean it up
+                console.log(`WARNING: Stale bookedMatchId found (${slot.bookedMatchId}). Cleaning up...`);
+                weeklyAvailability.schedule[dayName][timeSlot].bookedMatchId = null;
+
+                // Also clean up the guestMatchRequests array from stale IDs
+                const requestIds = weeklyAvailability.schedule[dayName][timeSlot].guestMatchRequests || [];
+                const validRequestIds = [];
+
+                for (const reqId of requestIds) {
+                    const req = await GuestMatchRequest.findById(reqId);
+                    if (req && req.status === 'pending') {
+                        validRequestIds.push(reqId);
+                    }
+                }
+
+                weeklyAvailability.schedule[dayName][timeSlot].guestMatchRequests = validRequestIds;
+                await weeklyAvailability.save();
+                console.log(`Stale references cleared. Valid requests remaining: ${validRequestIds.length}`);
+            }
         }
 
         if (slot.mode === 'unavailable') {

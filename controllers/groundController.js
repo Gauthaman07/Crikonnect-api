@@ -1,6 +1,6 @@
 const Team = require('../models/team');
 const Ground = require('../models/ground');
-const GroundBooking = require('../models/groundBooking');
+const GuestMatchRequest = require('../models/guestMatchRequest');
 
 const getAvailableGrounds = async (req, res) => {
     try {
@@ -20,13 +20,13 @@ const getAvailableGrounds = async (req, res) => {
         let yourGround = null;
 
         if (userTeam.hasOwnGround && userTeam.groundId) {
-            const allBookings = await GroundBooking.find({
+            const allBookings = await GuestMatchRequest.find({
                 groundId: userTeam.groundId._id,
-                status: { $in: ['pending', 'booked'] },
-                bookedDate: { $gte: today }
+                status: { $in: ['pending', 'approved'] },
+                requestedDate: { $gte: today }
             })
                 .populate({
-                    path: 'bookedByTeam',
+                    path: 'teamA',
                     select: 'teamName teamLogo'
                 })
                 .sort({ bookedDate: 1 });
@@ -63,10 +63,10 @@ const getAvailableGrounds = async (req, res) => {
             .select('groundName description groundMaplink image facilities location fee createdBy ownedByTeam');
 
         // Get this user's team bookings
-        const userBookings = await GroundBooking.find({
-            bookedByTeam: userTeam._id,
-            status: { $in: ['pending', 'booked'] },
-            bookedDate: { $gte: today }
+        const userBookings = await GuestMatchRequest.find({
+            teamA: userTeam._id,
+            status: { $in: ['pending', 'approved'] },
+            requestedDate: { $gte: today }
         })
             .populate({
                 path: 'groundId',

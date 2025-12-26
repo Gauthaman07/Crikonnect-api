@@ -16,9 +16,7 @@ AdminJS.registerAdapter(AdminJSMongoose);
 // Import your models
 const User = require('../models/User');
 const Ground = require('../models/ground');
-const GroundBooking = require('../models/groundBooking');
 const GuestMatchRequest = require('../models/guestMatchRequest');
-const HostOnlyRequest = require('../models/hostOnlyRequest');
 const Match = require('../models/match');
 const Team = require('../models/team');
 const TeamTournamentRegistration = require('../models/TeamTournamentRegistration');
@@ -84,21 +82,6 @@ const adminOptions = {
             options: { navigation: { name: 'Ground Management', icon: 'Map' } }
         },
         {
-            resource: GroundBooking,
-            options: { 
-                navigation: { name: 'Ground Management', icon: 'Calendar' },
-                properties: {
-                    status: {
-                        availableValues: [
-                            { value: 'pending', label: '⏳ Pending' },
-                            { value: 'booked', label: '✅ Booked' },
-                            { value: 'rejected', label: '❌ Rejected' }
-                        ]
-                    }
-                }
-            }
-        },
-        {
             resource: WeeklyAvailability,
             options: { navigation: { name: 'Ground Management', icon: 'Clock' } }
         },
@@ -114,10 +97,6 @@ const adminOptions = {
         },
         {
             resource: GuestMatchRequest,
-            options: { navigation: { name: 'Match Management', icon: 'Inbox' } }
-        },
-        {
-            resource: HostOnlyRequest,
             options: { navigation: { name: 'Match Management', icon: 'Inbox' } }
         },
         {
