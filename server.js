@@ -12,7 +12,6 @@ const userProfileRoutes = require('./routes/userprofile');
 const teamRoutes = require('./routes/teamRoutes');
 const cloudinary = require('cloudinary').v2;
 const groundRoutes = require('./routes/groundRoutes');
-const groundBookingRoutes = require('./routes/groundBookingRoutes');
 const tournamentRoutes = require('./routes/tournamentRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const weeklyAvailabilityRoutes = require('./routes/weeklyAvailabilityRoutes');
@@ -63,7 +62,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userProfileRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/grounds', groundRoutes);
-app.use('/api/ground-booking', groundBookingRoutes);
 app.use('/api/notifications', notificationRoutes);
 // Test route
 app.get('/', (req, res) => {

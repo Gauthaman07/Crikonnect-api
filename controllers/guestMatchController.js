@@ -112,13 +112,43 @@ const requestGuestMatch = async (req, res) => {
 
         // CASE 1: OWNER PLAY
         if (slot.mode === 'owner_play') {
+            // Prevent owner team from booking their own ground
+            if (teamAId === ground.ownedByTeam._id.toString()) {
+                return res.status(400).json({
+                    message: 'Ground owner team cannot book their own ground. Please use availability settings to schedule matches.'
+                });
+            }
+
             matchType = 'vs_owner';
             finalTeamBId = ground.ownedByTeam._id; // Force Team B to be Owner
         } 
         // CASE 2: HOST ONLY
         else if (slot.mode === 'host_only') {
+            // Prevent owner team from booking in host_only mode (they're hosting, not playing)
+            if (teamAId === ground.ownedByTeam._id.toString()) {
+                return res.status(400).json({
+                    message: 'Ground owner team cannot book in host-only mode. You are hosting this session, not playing.'
+                });
+            }
+
             matchType = 'guest_vs_guest';
-            
+
+            // Check if slot already has a complete pair pending approval (block multiple matches per slot)
+            const completePair = await GuestMatchRequest.findOne({
+                weeklyAvailabilityId: weeklyAvailability._id,
+                requestedDate: requestedDateObj,
+                timeSlot: timeSlot,
+                teamB: { $ne: null }, // Has both teams
+                status: 'pending',
+                matchType: 'guest_vs_guest'
+            });
+
+            if (completePair) {
+                return res.status(400).json({
+                    message: 'This slot already has a complete match (Team A vs Team B) pending approval. Please choose another slot.'
+                });
+            }
+
             // If teamB NOT provided, try Auto-Pairing
             if (!finalTeamBId) {
                 // Find a pending SINGLE request for this slot
@@ -375,11 +405,28 @@ const respondToGuestMatch = async (req, res) => {
                     type: 'guest_match_response'
                 }
             );
-            console.log('Push notification sent to requesting team');
-        } catch (pushError) { console.error('Error sending push notification:', pushError); }
-        
-        // Note: In a real app, we should also notify Team B if it exists.
-        
+            console.log('Push notification sent to Team A');
+        } catch (pushError) { console.error('Error sending push notification to Team A:', pushError); }
+
+        // Notify Team B if it exists (for paired matches)
+        if (guestRequest.teamB) {
+            try {
+                const teamBData = await Team.findById(guestRequest.teamB).populate('createdBy');
+                if (teamBData && teamBData.createdBy) {
+                    await sendPushNotification(
+                        teamBData.createdBy._id,
+                        { title: notificationTitle, body: notificationBody },
+                        {
+                            requestId: guestRequest._id.toString(),
+                            status: dbStatus,
+                            type: 'guest_match_response'
+                        }
+                    );
+                    console.log('Push notification sent to Team B');
+                }
+            } catch (pushError) { console.error('Error sending push notification to Team B:', pushError); }
+        }
+
         res.status(200).json({
             success: true,
             message: `Guest match request ${status} successfully.`,
