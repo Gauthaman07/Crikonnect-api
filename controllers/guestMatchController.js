@@ -353,11 +353,9 @@ const respondToGuestMatch = async (req, res) => {
         // Verify user is the ground owner
         console.log('🔍 DEBUG: Verifying ground owner');
         console.log('🔍 DEBUG: Logged-in userId:', userId);
-        console.log('🔍 DEBUG: ownerTeamId:', guestRequest.ownerTeamId);
         console.log('🔍 DEBUG: ownerTeamId.createdBy:', guestRequest.ownerTeamId.createdBy);
-        console.log('🔍 DEBUG: Match?', guestRequest.ownerTeamId.createdBy.toString() === userId);
 
-        if (guestRequest.ownerTeamId.createdBy.toString() !== userId) {
+        if (guestRequest.ownerTeamId.createdBy.toString() !== userId.toString()) {
             console.log('❌ DEBUG: Ground owner check FAILED');
             return res.status(403).json({
                 message: 'Only the ground owner can respond to this request.'
