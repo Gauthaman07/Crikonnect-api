@@ -129,31 +129,83 @@ const generateNextWeekAvailability = async (req, res) => {
     }
 };
 
+// Helper function to ensure next 3 weeks exist
+const ensureThreeWeeksExist = async (groundId, ownerTeamId) => {
+    const today = new Date();
+    const currentMonday = getMondayOfWeek(today);
+
+    // Get or create template from current week
+    const currentWeek = await WeeklyAvailability.findOne({
+        groundId: groundId,
+        weekStartDate: currentMonday
+    });
+
+    let scheduleTemplate = createDefaultSchedule();
+
+    if (currentWeek) {
+        // Copy current week's schedule as template (without bookings)
+        scheduleTemplate = JSON.parse(JSON.stringify(currentWeek.schedule));
+        Object.keys(scheduleTemplate).forEach(day => {
+            scheduleTemplate[day].morning.guestMatchRequests = [];
+            scheduleTemplate[day].morning.bookedMatchId = null;
+            scheduleTemplate[day].afternoon.guestMatchRequests = [];
+            scheduleTemplate[day].afternoon.bookedMatchId = null;
+        });
+    }
+
+    // Ensure next 3 weeks exist (including current week)
+    for (let i = 0; i < 3; i++) {
+        const nextMonday = new Date(currentMonday);
+        nextMonday.setDate(currentMonday.getDate() + (7 * i));
+        const nextSunday = getSundayOfWeek(nextMonday);
+
+        const exists = await WeeklyAvailability.findOne({
+            groundId: groundId,
+            weekStartDate: nextMonday
+        });
+
+        if (!exists) {
+            const newWeekAvailability = new WeeklyAvailability({
+                groundId: groundId,
+                ownerTeamId: ownerTeamId,
+                weekStartDate: nextMonday,
+                weekEndDate: nextSunday,
+                schedule: scheduleTemplate
+            });
+            await newWeekAvailability.save();
+            console.log(`✅ Created availability for week starting: ${nextMonday.toDateString()}`);
+        }
+    }
+};
+
 // Get weekly availability for ground owner
 const getWeeklyAvailability = async (req, res) => {
     try {
         const userId = req.user.id;
         const { weekStartDate } = req.query;
-        
+
         // Find user's team that owns a ground
-        const ownerTeam = await Team.findOne({ 
-            createdBy: userId, 
-            hasOwnGround: true 
+        const ownerTeam = await Team.findOne({
+            createdBy: userId,
+            hasOwnGround: true
         }).populate('groundId');
-        
+
         if (!ownerTeam || !ownerTeam.groundId) {
-            return res.status(404).json({ 
-                message: 'No ground found for this user.' 
+            return res.status(404).json({
+                message: 'No ground found for this user.'
             });
         }
-        
+
+        // Ensure next 3 weeks exist before fetching
+        await ensureThreeWeeksExist(ownerTeam.groundId._id, ownerTeam._id);
+
         let monday;
         if (weekStartDate) {
             monday = getMondayOfWeek(new Date(weekStartDate));
         } else {
             monday = getMondayOfWeek(new Date());
         }
-        
+
         // Find or create weekly availability
         let weeklyAvailability = await WeeklyAvailability.findOne({
             groundId: ownerTeam.groundId._id,
@@ -210,32 +262,50 @@ const updateDayTimeSlot = async (req, res) => {
     try {
         const userId = req.user.id;
         const { weekStartDate, day, timeSlot, mode } = req.body;
-        
+
         if (!['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].includes(day)) {
             return res.status(400).json({ message: 'Invalid day specified.' });
         }
-        
+
         if (!['morning', 'afternoon'].includes(timeSlot)) {
             return res.status(400).json({ message: 'Invalid time slot specified.' });
         }
-        
+
         if (!['owner_play', 'host_only', 'unavailable'].includes(mode)) {
             return res.status(400).json({ message: 'Invalid mode specified.' });
         }
-        
-        // Find user's team that owns a ground
-        const ownerTeam = await Team.findOne({ 
-            createdBy: userId, 
-            hasOwnGround: true 
-        });
-        
-        if (!ownerTeam) {
-            return res.status(404).json({ 
-                message: 'No ground found for this user.' 
+
+        // Calculate the actual date being modified
+        const monday = getMondayOfWeek(new Date(weekStartDate));
+        const dayIndex = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].indexOf(day);
+        const targetDate = new Date(monday);
+        targetDate.setDate(monday.getDate() + dayIndex);
+        targetDate.setHours(0, 0, 0, 0);
+
+        // Block changes 1 day before (must modify at least 2 days in advance)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+
+        if (targetDate <= tomorrow) {
+            return res.status(403).json({
+                success: false,
+                message: `Cannot change availability for ${day}. Changes must be made at least 1 day in advance (by ${tomorrow.toDateString()}).`
             });
         }
-        
-        const monday = getMondayOfWeek(new Date(weekStartDate));
+
+        // Find user's team that owns a ground
+        const ownerTeam = await Team.findOne({
+            createdBy: userId,
+            hasOwnGround: true
+        });
+
+        if (!ownerTeam) {
+            return res.status(404).json({
+                message: 'No ground found for this user.'
+            });
+        }
         
         // Find weekly availability
         const weeklyAvailability = await WeeklyAvailability.findOne({
