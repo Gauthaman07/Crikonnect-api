@@ -90,18 +90,12 @@ app.use('/api/weekly-availability', weeklyAvailabilityRoutes);
 app.use('/api/guest-matches', guestMatchRoutes);
 
 
-// MongoDB Connection with better error handling
+// MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/sportsBooking';
 
-console.log('Attempting to connect to MongoDB...');
-console.log('MongoDB URI:', MONGO_URI.replace(/\/\/[^:]+:[^@]+@/, '//<credentials>@')); // Hide credentials in log
-
-mongoose.connect(MONGO_URI, {
-    serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
-    socketTimeoutMS: 45000,
-})
+mongoose.connect(MONGO_URI)
     .then(() => {
-        console.log('✅ Successfully connected to MongoDB');
+        console.log('Connected to MongoDB');
         // Start weekly schedule cron job after DB connection
         const { startWeeklyScheduleCron } = require('./services/weeklyScheduleService');
         startWeeklyScheduleCron();
@@ -111,19 +105,9 @@ mongoose.connect(MONGO_URI, {
         startReminderCron();
     })
     .catch(err => {
-        console.error('❌ Failed to connect to MongoDB:', err.message);
-        console.error('Full error:', err);
+        console.error('Failed to connect to MongoDB:', err.message);
         process.exit(1); // Exit process if DB connection fails
     });
-
-// Monitor MongoDB connection status
-mongoose.connection.on('disconnected', () => {
-    console.log('⚠️ MongoDB disconnected');
-});
-
-mongoose.connection.on('error', (err) => {
-    console.error('❌ MongoDB connection error:', err);
-});
 
 
 // 404 handler - must come after all routes

@@ -168,8 +168,6 @@ exports.updateFcmToken = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
     const { email } = req.body;
 
-    console.log('Forgot password request for email:', email);
-
     if (!email) {
         return res.status(400).json({
             success: false,
@@ -180,9 +178,7 @@ exports.forgotPassword = async (req, res) => {
     let user; // Declare user outside try block so it's accessible in catch
 
     try {
-        console.log('Looking up user in database...');
-        user = await User.findOne({ email }).maxTimeMS(5000); // Add 5 second timeout
-        console.log('User found:', user ? 'Yes' : 'No');
+        user = await User.findOne({ email });
 
         if (!user) {
             return res.status(404).json({
@@ -238,9 +234,7 @@ exports.forgotPassword = async (req, res) => {
         };
 
         // Send email
-        console.log('Sending email to:', user.email);
         await transporter.sendMail(mailOptions);
-        console.log('Email sent successfully');
 
         res.status(200).json({
             success: true,
@@ -249,7 +243,6 @@ exports.forgotPassword = async (req, res) => {
 
     } catch (error) {
         console.error('Error in forgot password:', error);
-        console.error('Error stack:', error.stack);
 
         // Reset the fields if email sending fails
         if (user) {
