@@ -67,29 +67,63 @@ app.use('/api/notifications', notificationRoutes);
 app.get('/', (req, res) => {
     res.send('Welcome to the Sports Booking API!');
 });
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    const dbStatus = mongoose.connection.readyState;
+    const statusMap = {
+        0: 'disconnected',
+        1: 'connected',
+        2: 'connecting',
+        3: 'disconnecting'
+    };
+
+    res.json({
+        status: 'ok',
+        database: statusMap[dbStatus] || 'unknown',
+        timestamp: new Date().toISOString()
+    });
+});
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/fixtures', require('./routes/fixtureRoutes'));
 app.use('/api/weekly-availability', weeklyAvailabilityRoutes);
 app.use('/api/guest-matches', guestMatchRoutes);
 
 
-// MongoDB Connection
+// MongoDB Connection with better error handling
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/sportsBooking';
-mongoose.connect(MONGO_URI)
+
+console.log('Attempting to connect to MongoDB...');
+console.log('MongoDB URI:', MONGO_URI.replace(/\/\/[^:]+:[^@]+@/, '//<credentials>@')); // Hide credentials in log
+
+mongoose.connect(MONGO_URI, {
+    serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+    socketTimeoutMS: 45000,
+})
     .then(() => {
-        console.log('Connected to MongoDB');
+        console.log('✅ Successfully connected to MongoDB');
         // Start weekly schedule cron job after DB connection
         const { startWeeklyScheduleCron } = require('./services/weeklyScheduleService');
         startWeeklyScheduleCron();
-        
+
         // Start match reminder cron job
         const { startReminderCron } = require('./services/reminderService');
         startReminderCron();
     })
     .catch(err => {
-        console.error('Failed to connect to MongoDB:', err.message);
+        console.error('❌ Failed to connect to MongoDB:', err.message);
+        console.error('Full error:', err);
         process.exit(1); // Exit process if DB connection fails
     });
+
+// Monitor MongoDB connection status
+mongoose.connection.on('disconnected', () => {
+    console.log('⚠️ MongoDB disconnected');
+});
+
+mongoose.connection.on('error', (err) => {
+    console.error('❌ MongoDB connection error:', err);
+});
 
 
 // Error handling middleware
