@@ -795,9 +795,9 @@ const getMyGuestRequests = async (req, res) => {
                 groundOwnerLogo: booking.groundId?.ownedByTeam?.teamLogo || null,
                 teamName: userTeam?.teamName || 'Unknown Team',
                 teamLogo: userTeam?.teamLogo || null,
-                opponentTeam: booking.teamB ? {
-                    name: booking.teamB.teamName,
-                    logo: booking.teamB.teamLogo
+                opponentTeam: opponentTeam ? {
+                    name: opponentTeam.teamName,
+                    logo: opponentTeam.teamLogo
                 } : null,
                 bookedDate: formattedDate, // Frontend expects 'bookedDate' string
                 timeSlot: booking.timeSlot,
