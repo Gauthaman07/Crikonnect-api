@@ -45,7 +45,10 @@ const requestGuestMatch = async (req, res) => {
 
         const requestingTeam = await Team.findOne({
             _id: teamAId,
-            $or: [{ createdBy: userId }, { members: userId }]
+            $or: [
+                { createdBy: userId },
+                { members: { $in: [userId] } }  // Use $in operator for array membership check
+            ]
         });
 
         console.log(`DEBUG: Team lookup result:`, requestingTeam ? `Found team: ${requestingTeam.teamName}` : 'Team not found or user not a member');
