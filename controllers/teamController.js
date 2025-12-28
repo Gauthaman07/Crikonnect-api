@@ -36,6 +36,7 @@ const createTeam = async (req, res) => {
             location,
             hasOwnGround: hasGround,
             createdBy: userId,
+            members: [userId], // Add creator to members array
         });
         const savedTeam = await newTeam.save();
 

@@ -612,10 +612,14 @@ const getPendingGuestRequests = async (req, res) => {
         
         // Retrieve Confirmed Matches (for the tab)
         // Find requests that are 'approved' (booked)
-         const confirmedRequests = await GuestMatchRequest.find({
+        // Show matches from today onwards (including past matches from today)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Start of today
+
+        const confirmedRequests = await GuestMatchRequest.find({
             ownerTeamId: ownerTeam._id,
             status: 'approved',
-            requestedDate: { $gte: new Date() } // Future only
+            requestedDate: { $gte: today } // From today onwards
         })
         .populate('groundId', 'groundName location')
         .populate('teamA', 'teamName teamLogo')
