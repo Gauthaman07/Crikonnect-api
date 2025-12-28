@@ -742,23 +742,44 @@ const getMyGuestRequests = async (req, res) => {
             // Determine match description based on booking type
             let matchDescription = '';
             let matchType = booking.matchType || 'regular';
-            
+
             // Map matchType to old availabilityMode names for frontend compatibility if needed,
             // or just use matchType logic.
             // Backend uses: 'vs_owner', 'guest_vs_guest'
             // Frontend expects: 'owner_play', 'host_only' (legacy) OR adapt to new values.
-            
+
             // Let's normalize for Frontend compatibility:
             let availabilityMode = 'regular';
             if (matchType === 'vs_owner') availabilityMode = 'owner_play';
             else if (matchType === 'guest_vs_guest') availabilityMode = 'host_only';
 
-            if (matchType === 'vs_owner') {
-                matchDescription = `${booking.teamA?.teamName} vs ${booking.groundId?.ownedByTeam?.teamName || 'Ground Owner'}`;
-            } else if (matchType === 'guest_vs_guest' && booking.teamB) {
-                matchDescription = `${booking.teamA?.teamName} vs ${booking.teamB?.teamName}`;
+            // Determine which team the user belongs to
+            const userTeamId = userTeams.find(team =>
+                team._id.toString() === booking.teamA?._id?.toString() ||
+                team._id.toString() === booking.teamB?._id?.toString()
+            )?._id;
+
+            // Set the user's team as the primary team to display
+            let userTeam, opponentTeam;
+            if (userTeamId && booking.teamA?._id?.toString() === userTeamId.toString()) {
+                userTeam = booking.teamA;
+                opponentTeam = booking.teamB;
+            } else if (userTeamId && booking.teamB?._id?.toString() === userTeamId.toString()) {
+                userTeam = booking.teamB;
+                opponentTeam = booking.teamA;
             } else {
-                matchDescription = `${booking.teamA?.teamName} (Waiting for Opponent)`;
+                // Fallback to teamA if no match found
+                userTeam = booking.teamA;
+                opponentTeam = booking.teamB;
+            }
+
+            // Build match description with correct team names
+            if (matchType === 'vs_owner') {
+                matchDescription = `${userTeam?.teamName} vs ${booking.groundId?.ownedByTeam?.teamName || 'Ground Owner'}`;
+            } else if (matchType === 'guest_vs_guest' && opponentTeam) {
+                matchDescription = `${userTeam?.teamName} vs ${opponentTeam?.teamName}`;
+            } else {
+                matchDescription = `${userTeam?.teamName} (Waiting for Opponent)`;
             }
 
             // Map status 'approved' -> 'booked' for frontend compatibility
@@ -772,8 +793,8 @@ const getMyGuestRequests = async (req, res) => {
                 groundImage: booking.groundId?.image || null,
                 groundOwner: booking.groundId?.ownedByTeam?.teamName || 'Unknown Owner',
                 groundOwnerLogo: booking.groundId?.ownedByTeam?.teamLogo || null,
-                teamName: booking.teamA?.teamName || 'Unknown Team',
-                teamLogo: booking.teamA?.teamLogo || null,
+                teamName: userTeam?.teamName || 'Unknown Team',
+                teamLogo: userTeam?.teamLogo || null,
                 opponentTeam: booking.teamB ? {
                     name: booking.teamB.teamName,
                     logo: booking.teamB.teamLogo
