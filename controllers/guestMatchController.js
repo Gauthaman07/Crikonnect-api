@@ -351,11 +351,20 @@ const respondToGuestMatch = async (req, res) => {
         }
         
         // Verify user is the ground owner
+        console.log('🔍 DEBUG: Verifying ground owner');
+        console.log('🔍 DEBUG: Logged-in userId:', userId);
+        console.log('🔍 DEBUG: ownerTeamId:', guestRequest.ownerTeamId);
+        console.log('🔍 DEBUG: ownerTeamId.createdBy:', guestRequest.ownerTeamId.createdBy);
+        console.log('🔍 DEBUG: Match?', guestRequest.ownerTeamId.createdBy.toString() === userId);
+
         if (guestRequest.ownerTeamId.createdBy.toString() !== userId) {
-            return res.status(403).json({ 
-                message: 'Only the ground owner can respond to this request.' 
+            console.log('❌ DEBUG: Ground owner check FAILED');
+            return res.status(403).json({
+                message: 'Only the ground owner can respond to this request.'
             });
         }
+
+        console.log('✅ DEBUG: Ground owner check PASSED');
         
         // Allow re-approving if it was just pending, but not if already finalized (unless we want to allow overwrites, but let's be safe)
         if (guestRequest.status !== 'pending') {
