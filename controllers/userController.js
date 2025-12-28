@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const Team = require('../models/team');    // Add this line
 const Ground = require('../models/ground');
-const transporter = require('../config/emailConfig');
+const sgMail = require('../config/emailConfig');
 
 // Signup logic (already implemented)
 exports.signup = async (req, res) => {
@@ -196,10 +196,10 @@ exports.forgotPassword = async (req, res) => {
 
         await user.save();
 
-        // Email options
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
+        // Email message for SendGrid
+        const msg = {
             to: user.email,
+            from: process.env.EMAIL_USER || 'crickonnectapp@gmail.com',
             subject: 'Crickonnect - Password Reset Code',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -233,8 +233,8 @@ exports.forgotPassword = async (req, res) => {
             `
         };
 
-        // Send email
-        await transporter.sendMail(mailOptions);
+        // Send email with SendGrid
+        await sgMail.send(msg);
 
         res.status(200).json({
             success: true,
