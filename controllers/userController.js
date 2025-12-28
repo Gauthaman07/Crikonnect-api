@@ -172,11 +172,16 @@ exports.forgotPassword = async (req, res) => {
         return res.status(400).json({ message: 'Email is required' });
     }
 
+    let user; // Declare user outside try block so it's accessible in catch
+
     try {
-        const user = await User.findOne({ email });
+        user = await User.findOne({ email });
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found with this email address' });
+            return res.status(404).json({
+                success: false,
+                message: 'User not found with this email address'
+            });
         }
 
         // Generate 6-digit OTP
@@ -229,6 +234,7 @@ exports.forgotPassword = async (req, res) => {
         await transporter.sendMail(mailOptions);
 
         res.status(200).json({
+            success: true,
             message: 'Password reset code sent to your email successfully'
         });
 
@@ -242,7 +248,10 @@ exports.forgotPassword = async (req, res) => {
             await user.save();
         }
 
-        res.status(500).json({ message: 'Error sending password reset code' });
+        res.status(500).json({
+            success: false,
+            message: 'Error sending password reset code'
+        });
     }
 };
 
@@ -251,7 +260,10 @@ exports.verifyOTP = async (req, res) => {
     const { email, otp } = req.body;
 
     if (!email || !otp) {
-        return res.status(400).json({ message: 'Email and OTP are required' });
+        return res.status(400).json({
+            success: false,
+            message: 'Email and OTP are required'
+        });
     }
 
     try {
@@ -262,17 +274,24 @@ exports.verifyOTP = async (req, res) => {
         });
 
         if (!user) {
-            return res.status(400).json({ message: 'Invalid or expired OTP' });
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid or expired OTP'
+            });
         }
 
         res.status(200).json({
+            success: true,
             message: 'OTP verified successfully',
             verified: true
         });
 
     } catch (error) {
         console.error('Error in OTP verification:', error);
-        res.status(500).json({ message: 'Error verifying OTP' });
+        res.status(500).json({
+            success: false,
+            message: 'Error verifying OTP'
+        });
     }
 };
 
@@ -281,11 +300,17 @@ exports.resetPassword = async (req, res) => {
     const { email, otp, newPassword } = req.body;
 
     if (!email || !otp || !newPassword) {
-        return res.status(400).json({ message: 'Email, OTP, and new password are required' });
+        return res.status(400).json({
+            success: false,
+            message: 'Email, OTP, and new password are required'
+        });
     }
 
     if (newPassword.length < 6) {
-        return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+        return res.status(400).json({
+            success: false,
+            message: 'Password must be at least 6 characters long'
+        });
     }
 
     try {
@@ -296,7 +321,10 @@ exports.resetPassword = async (req, res) => {
         });
 
         if (!user) {
-            return res.status(400).json({ message: 'Invalid or expired OTP' });
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid or expired OTP'
+            });
         }
 
         // Hash the new password
@@ -310,11 +338,15 @@ exports.resetPassword = async (req, res) => {
         await user.save();
 
         res.status(200).json({
+            success: true,
             message: 'Password reset successfully'
         });
 
     } catch (error) {
         console.error('Error in reset password:', error);
-        res.status(500).json({ message: 'Error resetting password' });
+        res.status(500).json({
+            success: false,
+            message: 'Error resetting password'
+        });
     }
 };
