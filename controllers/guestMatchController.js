@@ -492,14 +492,18 @@ const getPendingGuestRequests = async (req, res) => {
         const userId = req.user.id;
         
         // Find user's team that owns a ground
-        const ownerTeam = await Team.findOne({ 
-            createdBy: userId, 
-            hasOwnGround: true 
+        const ownerTeam = await Team.findOne({
+            createdBy: userId,
+            hasOwnGround: true
         }).populate('groundId');
-        
+
         if (!ownerTeam) {
-            return res.status(404).json({ 
-                message: 'No ground found for this user.' 
+            // Return empty arrays instead of error - user just doesn't own a ground
+            return res.status(200).json({
+                success: true,
+                message: 'No ground found for this user.',
+                pendingRequests: [],
+                confirmedMatches: []
             });
         }
         
