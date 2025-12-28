@@ -5,11 +5,22 @@ const { signup, login, forgotPassword, verifyOTP, resetPassword } = require('../
 const authenticateUser = require('../middleware/authenticateUser');
 const router = express.Router();
 
-router.post('/signup', signup);
-router.post('/login', login);
-router.post('/forgot-password', forgotPassword);
-router.post('/verify-otp', verifyOTP);
-router.post('/reset-password', resetPassword);
+// Wrap async route handlers to catch errors
+const asyncHandler = (fn) => (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(err => {
+        console.error('Route error:', err);
+        res.status(500).json({
+            success: false,
+            message: err.message || 'Internal server error'
+        });
+    });
+};
+
+router.post('/signup', asyncHandler(signup));
+router.post('/login', asyncHandler(login));
+router.post('/forgot-password', asyncHandler(forgotPassword));
+router.post('/verify-otp', asyncHandler(verifyOTP));
+router.post('/reset-password', asyncHandler(resetPassword));
 
 // Validate session endpoint - checks if token is valid and user exists
 router.get('/validate-session', authenticateUser, (req, res) => {
